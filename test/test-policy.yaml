@@ -1,0 +1,8 @@
+apiVersion: sec.sovereign.io/v1alpha1
+kind: SovereigntyPolicy
+metadata:
+  name: eu-strict
+spec:
+  action: block
+  namespaces: ["eu-prod"]
+  allowedCountries: ["DE", "FR"]

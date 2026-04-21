@@ -1,0 +1,10 @@
+image:
+  repository: sovereign-sensor 
+  pullPolicy: Never
+  tag: "latest"
+
+tetragon:
+  # Assuming Tetragon is running on the host network port 54321
+  serverAddress: "127.0.0.1:54321"
+
+logLevel: "INFO"

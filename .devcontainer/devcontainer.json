@@ -1,0 +1,29 @@
+{
+	"name": "sovereign-sensor",
+	"image": "mcr.microsoft.com/devcontainers/base:bookworm",
+	"features": {
+		"ghcr.io/devcontainers/features/go:1": {},
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
+		"ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {},
+		"ghcr.io/mpriscella/features/kind:1": {}
+	},
+	"runArgs": [
+		// 1. Give the container permission to load eBPF programs into the kernel
+		"--privileged",
+		"--pid=host",
+		"--cgroupns=host",
+		"--volume=/proc:/host/proc:ro",
+		"--volume=/sys/kernel/debug:/sys/kernel/debug:rw"
+	],
+	"remoteUser": "vscode",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"golang.Go",
+				"ms-kubernetes-tools.vscode-kubernetes-tools",
+				"ms-azuretools.vscode-docker",
+				"ms-vscode-remote.remote-containers",
+			]
+		}
+	}
+}

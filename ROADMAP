@@ -1,0 +1,28 @@
+# sovereign-sensor roadmap
+
+
+**Tier 2 — core capabilities**
+
+- Prometheus metrics are table stakes for anything running in a production cluster. 
+- Label-based scoping lets you write policies like "any pod with `data-classification: pii` must not egress outside DE" — far more expressive than namespace-only matching.
+
+**Tier 3 — CNCF sandbox requirements**
+
+- `GOVERNANCE.md` with maintainer process
+- `SECURITY.md` with vulnerability disclosure
+- CI with passing tests
+- multi-arch container images. 
+- The two less obvious items here are the CRD and the Tetragon abstraction. A `SovereignPolicy` CRD lets users manage policies as native Kubernetes objects via `kubectl` — much better than a ConfigMap with YAML. The Tetragon abstraction is the CNCF committee's likely concern: right now Tetragon is a hard dependency. A `SensorBackend` interface with a Tetragon implementation (and a stub native eBPF implementation) makes the project defensibly independent.
+
+**Tier 4 — enterprise expectations**
+
+An enterprise security buyer will ask about four things in this order: 
+- can it block (not just log)
+- can I get a report I can show a regulator
+- does it integrate with my SIEM
+- can it run across my whole fleet
+
+- The admission webhook is the enforcement story. The audit log export needs to be append-only and ideally cryptographically signed — a log that can be tampered with is worthless to a DPA. The compliance report generator (automating GDPR Article 30 "records of processing activities") is the feature that makes a CISO's legal team love you. 
+- Transitive chain detection — proving that your vendor's vendor is the leak source — is the original thesis of the project and the thing no other tool does.
+
+The one architectural note worth flagging now: the Tetragon abstraction in Tier 3 will affect everything else. If you plan to eventually support native eBPF alongside Tetragon, defining the `SensorBackend` interface early saves a painful refactor later. It's worth doing before Tier 4 work begins.
