@@ -1,0 +1,76 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: sovereignsensors.sec.sovereign.io
+spec:
+  group: sec.sovereign.io
+  names:
+    kind: SovereignSensor
+    listKind: SovereignSensorList
+    plural: sovereignsensors
+    shortNames:
+    - ss
+    singular: sovereignsensor
+  scope: Cluster
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: SovereignSensor is the Schema for the sovereignsensors API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SovereignSensorSpec defines the desired state of SovereignSensor
+            properties:
+              deployTetragon:
+                default: true
+                description: Instructs the Operator to automatically deploy the Tetragon
+                  DaemonSet alongside the sensor.
+                type: boolean
+              logLevel:
+                default: INFO
+                description: Controls the verbosity of the sensor agents.
+                type: string
+              targetNamespace:
+                default: kube-system
+                description: The namespace where the DaemonSets should be deployed.
+                type: string
+            required:
+            - deployTetragon
+            type: object
+          status:
+            description: SovereignSensorStatus defines the observed state of SovereignSensor
+            properties:
+              activeAgents:
+                description: Tracks how many nodes currently have a healthy sensor
+                  agent running.
+                format: int32
+                type: integer
+              phase:
+                description: Reports the overarching health of the sensor deployment.
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

@@ -13,7 +13,9 @@ var MaxMindDB []byte
 
 // ─── GeoIP ───────────────────────────────────────────────────────────────────
 // GeoIP wraps the MaxMind GeoLite2-Country database.
-//  maxminddb uses mmap internally so lookups are microsecond-latency 
+//
+//	maxminddb uses mmap internally so lookups are microsecond-latency
+//
 // with no allocations on the hot path.
 type GeoIP struct {
 	db *maxminddb.Reader
@@ -28,7 +30,7 @@ type geoRecord struct {
 	} `maxminddb:"country"`
 }
 
-// NewGeoIP opens the embedded MaxMind database 
+// NewGeoIP opens the embedded MaxMind database
 func NewGeoIP() (*GeoIP, error) {
 	db, err := maxminddb.FromBytes(MaxMindDB)
 	if err != nil {

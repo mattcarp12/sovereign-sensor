@@ -11,18 +11,18 @@ import (
 func TestEvaluator(t *testing.T) {
 	// 1. Set up a dummy policy
 	policies := []Policy{
-			{
-				Name:             "eu-strict",
-				Namespaces:       []string{"eu-prod"},
-				AllowedCountries: []string{"DE", "FR"}, // Only Germany and France
-				Action:           ActionBlock,
-			},
-			{
-				Name:             "default-allow",
-				Namespaces:       []string{"*"},
-				AllowedCountries: []string{}, // Empty means allow all
-				Action:           ActionAllow,
-			},
+		{
+			Name:             "eu-strict",
+			Namespaces:       []string{"eu-prod"},
+			AllowedCountries: []string{"DE", "FR"}, // Only Germany and France
+			Action:           ActionBlock,
+		},
+		{
+			Name:             "default-allow",
+			Namespaces:       []string{"*"},
+			AllowedCountries: []string{}, // Empty means allow all
+			Action:           ActionAllow,
+		},
 	}
 
 	matcher := NewMatcher()

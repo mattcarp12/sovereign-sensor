@@ -1,0 +1,11 @@
+apiVersion: sec.sovereign.io/v1alpha1
+kind: SovereignSensor
+metadata:
+  labels:
+    app.kubernetes.io/name: sovereignsensor
+    app.kubernetes.io/managed-by: kustomize
+  name: sovereign-sensor
+spec:
+  targetNamespace: "kube-system"
+  logLevel: "DEBUG"
+  deployTetragon: true

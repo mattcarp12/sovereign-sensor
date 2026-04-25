@@ -1,0 +1,9 @@
+apiVersion: sec.sovereign.io/v1alpha1
+kind: SovereigntyPolicy
+metadata:
+  labels:
+    app.kubernetes.io/name: sovereign-sensor
+    app.kubernetes.io/managed-by: kustomize
+  name: sovereigntypolicy-sample
+spec:
+  # TODO(user): Add fields here
