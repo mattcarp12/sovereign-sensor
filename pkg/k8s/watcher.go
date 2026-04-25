@@ -69,13 +69,13 @@ func WatchPolicies(stopCh <-chan struct{}, matcher *policy.Matcher) {
 }
 
 // parseUnstructured safely extracts the spec from the raw K8s JSON
-func parseUnstructured(obj interface{}) *policy.Policy {
+func parseUnstructured(obj any) *policy.Policy {
 	u, ok := obj.(*unstructured.Unstructured)
 	if !ok {
 		return nil
 	}
 
-	spec, ok := u.Object["spec"].(map[string]interface{})
+	spec, ok := u.Object["spec"].(map[string]any)
 	if !ok {
 		return nil
 	}
@@ -88,15 +88,25 @@ func parseUnstructured(obj interface{}) *policy.Policy {
 		p.Action = policy.Action(action)
 	}
 
-	if namespaces, ok := spec["namespaces"].([]interface{}); ok {
+	if namespaces, ok := spec["namespaces"].([]any); ok {
 		for _, ns := range namespaces {
-			p.Namespaces = append(p.Namespaces, ns.(string))
+			nsStr, ok := ns.(string)
+			if !ok {
+				slog.Error("Invalid namespace value in policy", "name", p.Name, "value", ns)
+				continue
+			}
+			p.Namespaces = append(p.Namespaces, nsStr)
 		}
 	}
 
-	if countries, ok := spec["allowedCountries"].([]interface{}); ok {
+	if countries, ok := spec["allowedCountries"].([]any); ok {
 		for _, c := range countries {
-			p.AllowedCountries = append(p.AllowedCountries, c.(string))
+			cStr, ok := c.(string)
+			if !ok {
+				slog.Error("Invalid allowed country value in policy", "name", p.Name, "value", c)
+				continue
+			}
+			p.AllowedCountries = append(p.AllowedCountries, cStr)
 		}
 	}
 

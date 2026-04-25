@@ -51,3 +51,18 @@ deploy: load
 		--namespace kube-system \
 		--wait
 	@echo "✅ Deployment complete!"
+
+e2e: env-up deploy
+	@echo "🚀 Running end-to-end tests..."
+	go test -v ./test/e2e_test.go
+
+violate:
+	kubectl create namespace eu-prod || true
+	kubectl run violator --namespace eu-prod \
+    	--image=curlimages/curl \
+    	--restart=Never \
+    	-- sh -c "curl -s https://api.datadoghq.com"
+
+	kubectl wait --namespace eu-prod --for=condition=Ready pod/violator --timeout=30s
+	kubectl delete pod violator --namespace eu-prod --ignore-not-found
+	kubectl delete namespace eu-prod --ignore-not-found

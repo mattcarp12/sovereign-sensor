@@ -12,7 +12,9 @@ import (
 	"github.com/mattcarp12/sovereign-sensor/pkg/event"
 	"github.com/mattcarp12/sovereign-sensor/pkg/geo"
 	"github.com/mattcarp12/sovereign-sensor/pkg/k8s"
+	"github.com/mattcarp12/sovereign-sensor/pkg/metrics"
 	"github.com/mattcarp12/sovereign-sensor/pkg/policy"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type OutputPayload struct {
@@ -40,6 +42,8 @@ func main() {
 	matcher := policy.NewMatcher()
 	evaluator := policy.NewEvaluator(matcher, slog.Default())
 
+	go metrics.StartMetricsServer(":9090")
+
 	// Start watching Kubernetes for policy changes in the background
 	go k8s.WatchPolicies(ctx.Done(), matcher)
 
@@ -59,6 +63,8 @@ func main() {
 	// Range over the channel. This loop blocks until a new event arrives.
 	for ev := range eventsChan {
 
+		timer := prometheus.NewTimer(metrics.EvaluationDuration)
+
 		// Step A: Enrich GeoLocation
 		if ev.DestIP != "unknown" {
 			if country, err := geoip.LookupCountry(ev.DestIP); err == nil {
@@ -69,8 +75,12 @@ func main() {
 		// Step B: Evaluate Policy
 		verdict := evaluator.Evaluate(&ev)
 
+		timer.ObserveDuration()
+		metrics.ConnectionsEvaluated.WithLabelValues(ev.Namespace, ev.DestCountry, string(verdict.Action), verdict.PolicyName).Inc()
+
 		// Step C: Output
-		if err := enc.Encode(OutputPayload{SovereignEvent: ev, Verdict: &verdict}); err != nil {
+		payload := OutputPayload{SovereignEvent: ev, Verdict: &verdict}
+		if err := enc.Encode(payload); err != nil {
 			slog.Warn("Failed to encode JSON", "err", err)
 		}
 	}

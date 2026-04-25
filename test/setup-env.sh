@@ -38,6 +38,3 @@ fi
 
 echo "🎉 Environment is ready!"
 echo ""
-echo "Next Steps:"
-echo "1. Open a new terminal and run: make port-forward"
-echo "2. Run your Go agent: make run"
