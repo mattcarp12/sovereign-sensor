@@ -115,24 +115,8 @@ func (r *SovereignSensorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
-	// 4. Check if the DaemonSet already exists
-	found := &appsv1.DaemonSet{}
-	err := r.Get(ctx, types.NamespacedName{Name: ds.Name, Namespace: ds.Namespace}, found)
-	if err != nil && apierrors.IsNotFound(err) {
-		logger.Info("Creating a new DaemonSet", "DaemonSet.Namespace", ds.Namespace, "DaemonSet.Name", ds.Name)
-		err = r.Create(ctx, ds)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		// Created successfully - return and requeue
-		return ctrl.Result{Requeue: true}, nil
-	} else if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// 5. Update Status
+	// 4. Update Status
 	sensor.Status.Phase = "Running"
-	sensor.Status.ActiveAgents = found.Status.NumberReady
 	if err := r.Status().Update(ctx, &sensor); err != nil {
 		return ctrl.Result{}, err
 	}

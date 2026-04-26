@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	secv1alpha1 "github.com/mattcarp12/sovereign-sensor/api/v1alpha1"
+	"github.com/mattcarp12/sovereign-sensor/internal/api"
 	"github.com/mattcarp12/sovereign-sensor/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
@@ -193,6 +194,17 @@ func main() {
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
+
+	apiServer := &api.Server{
+		Client: mgr.GetClient(),
+	}
+
+	go func() {
+		setupLog.Info("Starting Frontend API server on port 8080")
+		if err := apiServer.Start(":8080"); err != nil {
+			setupLog.Error(err, "Frontend API server failed")
+		}
+	}()
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "Failed to set up health check")

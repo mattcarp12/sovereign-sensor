@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/* If you want to keep your custom color in CSS (v4 way): */
+@theme {
+  --color-k8s-blue: #326ce5;
+}

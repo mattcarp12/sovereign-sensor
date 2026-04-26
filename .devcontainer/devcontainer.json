@@ -5,7 +5,8 @@
 		"ghcr.io/devcontainers/features/go:1": {},
 		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
 		"ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {},
-		"ghcr.io/mpriscella/features/kind:1": {}
+		"ghcr.io/mpriscella/features/kind:1": {},
+		"ghcr.io/devcontainers/features/node:1": {}
 	},
 	"runArgs": [
 		// 1. Give the container permission to load eBPF programs into the kernel
