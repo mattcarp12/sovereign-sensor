@@ -1,9 +1,15 @@
 apiVersion: sec.sovereign.io/v1alpha1
 kind: SovereigntyPolicy
 metadata:
+  name: e2e-eu-only
   labels:
     app.kubernetes.io/name: sovereign-sensor
-    app.kubernetes.io/managed-by: kustomize
-  name: sovereigntypolicy-sample
 spec:
-  # TODO(user): Add fields here
+  action: log
+  namespaces:
+    - e2e-test
+  allowedCountries:
+    - DE
+    - IE
+    - NL
+  description: "e2e test policy — EU only"

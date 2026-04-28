@@ -10,3 +10,7 @@
 # Re-include Go module files
 !go.mod
 !go.sum
+
+# Allow our specific embedded folders
+!internal/api/dist
+!internal/controller/manifests

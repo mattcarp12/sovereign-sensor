@@ -42,7 +42,11 @@ func main() {
 	matcher := policy.NewMatcher()
 	evaluator := policy.NewEvaluator(matcher, slog.Default())
 
-	go metrics.StartMetricsServer(":9090")
+	metricsAddr := os.Getenv("METRICS_ADDR")
+	if metricsAddr == "" {
+		metricsAddr = ":9091" // change default away from 9090
+	}
+	go metrics.StartMetricsServer(metricsAddr)
 
 	// Start watching Kubernetes for policy changes in the background
 	go k8s.WatchPolicies(ctx.Done(), matcher)

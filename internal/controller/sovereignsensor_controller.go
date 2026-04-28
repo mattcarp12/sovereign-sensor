@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	_ "embed"
@@ -55,16 +56,11 @@ var tetragonManifests []byte
 // +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles;clusterrolebindings,verbs=get;list;watch;create;update;patch;delete
-
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the SovereignSensor object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
+// +kubebuilder:rbac:groups=sec.sovereign.io,resources=sovereigntypolicies,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=sec.sovereign.io,resources=sovereigntypolicies/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=sec.sovereign.io,resources=sovereigntypolicies/finalizers,verbs=update
+// +kubebuilder:rbac:groups=cilium.io,resources=tracingpolicies,verbs=get;list;watch;create;update;patch;delete
 //
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.23.3/pkg/reconcile
 // Reconcile is part of the main kubernetes reconciliation loop.
 func (r *SovereignSensorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
@@ -77,6 +73,35 @@ func (r *SovereignSensorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
+	}
+
+	const finalizerName = "sec.sovereign.io/cleanup"
+
+	// Handle deletion
+	if !sensor.DeletionTimestamp.IsZero() {
+		if controllerutil.ContainsFinalizer(&sensor, finalizerName) {
+			// Clean up cluster-scoped resources manually
+			cr := r.agentClusterRole(&sensor)
+			crb := r.agentClusterRoleBinding(&sensor)
+			for _, res := range []client.Object{crb, cr} {
+				if err := r.Delete(ctx, res); client.IgnoreNotFound(err) != nil {
+					return ctrl.Result{}, err
+				}
+			}
+			controllerutil.RemoveFinalizer(&sensor, finalizerName)
+			if err := r.Update(ctx, &sensor); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+		return ctrl.Result{}, nil
+	}
+
+	// Add finalizer if not present
+	if !controllerutil.ContainsFinalizer(&sensor, finalizerName) {
+		controllerutil.AddFinalizer(&sensor, finalizerName)
+		if err := r.Update(ctx, &sensor); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	// 1.5 Auto-Deploy Tetragon Dependency
@@ -94,23 +119,23 @@ func (r *SovereignSensorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	crb := r.agentClusterRoleBinding(&sensor)
 	ds := r.agentDaemonSet(&sensor)
 
-	// 3. Apply Resources sequentially
-	resources := []client.Object{sa, cr, crb, ds}
-
-	for _, res := range resources {
-		// Set owner reference for garbage collection
+	// 3. Set owner references and create/update resources
+	// Namespace-scoped resources — owner references work fine here
+	namespacedResources := []client.Object{sa, ds}
+	for _, res := range namespacedResources {
 		if err := ctrl.SetControllerReference(&sensor, res, r.Scheme); err != nil {
 			return ctrl.Result{}, err
 		}
+		if err := r.createIfNotExists(ctx, res); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
 
-		// Check if it exists
-		err := r.Get(ctx, types.NamespacedName{Name: res.GetName(), Namespace: res.GetNamespace()}, res)
-		if err != nil && apierrors.IsNotFound(err) {
-			logger.Info("Creating Resource", "Kind", res.GetObjectKind().GroupVersionKind().Kind, "Name", res.GetName())
-			if err = r.Create(ctx, res); err != nil {
-				return ctrl.Result{}, err
-			}
-		} else if err != nil {
+	// Cluster-scoped resources — owner references don't work cross-namespace.
+	// We manage cleanup via a finalizer instead.
+	clusterScopedResources := []client.Object{cr, crb}
+	for _, res := range clusterScopedResources {
+		if err := r.createIfNotExists(ctx, res); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
@@ -122,6 +147,17 @@ func (r *SovereignSensorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *SovereignSensorReconciler) createIfNotExists(ctx context.Context, obj client.Object) error {
+	err := r.Get(ctx, types.NamespacedName{
+		Name:      obj.GetName(),
+		Namespace: obj.GetNamespace(),
+	}, obj)
+	if apierrors.IsNotFound(err) {
+		return r.Create(ctx, obj)
+	}
+	return err
 }
 
 // agentDaemonSet returns a DaemonSet object for the SovereignSensor agent
@@ -147,15 +183,18 @@ func (r *SovereignSensorReconciler) agentDaemonSet(sensor *secv1alpha1.Sovereign
 					HostNetwork:        true, // Crucial for eBPF/Tetragon
 					Containers: []corev1.Container{{
 						Name:            "agent",
-						Image:           "sovereign-sensor:latest", // We will make this configurable later
+						Image:           "sovereign-sensor-agent:dev", // We will make this configurable later
 						ImagePullPolicy: corev1.PullIfNotPresent,
 						Env: []corev1.EnvVar{
-							{
-								Name:  "LOG_LEVEL",
-								Value: sensor.Spec.LogLevel,
-							},
+							{Name: "LOG_LEVEL", Value: sensor.Spec.LogLevel},
+							{Name: "METRICS_ADDR", Value: ":9091"},
+							{Name: "TETRAGON_SERVER", Value: "127.0.0.1:54321"},
 						},
-						// Note: You would mount your MaxMind DB volume here just like in Helm
+						Ports: []corev1.ContainerPort{{
+							Name:          "metrics",
+							ContainerPort: 9091,
+							Protocol:      corev1.ProtocolTCP,
+						}},
 					}},
 				},
 			},
@@ -180,8 +219,13 @@ func (r *SovereignSensorReconciler) agentClusterRole(sensor *secv1alpha1.Soverei
 		Rules: []rbacv1.PolicyRule{
 			{
 				APIGroups: []string{"sec.sovereign.io"},
-				Resources: []string{"sovereigntypolicies", "sovereigntypolicies/status"},
+				Resources: []string{"sovereigntypolicies"},
 				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				APIGroups: []string{"sec.sovereign.io"},
+				Resources: []string{"sovereigntypolicies/status"},
+				Verbs:     []string{"get", "update", "patch"},
 			},
 		},
 	}
@@ -228,21 +272,15 @@ func (r *SovereignSensorReconciler) applyManifests(ctx context.Context, yamlData
 			continue
 		}
 
-		// Attempt to fetch the object to see if it already exists
-		found := &unstructured.Unstructured{}
-		found.SetGroupVersionKind(obj.GroupVersionKind())
-		err := r.Get(ctx, types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}, found)
+		logger.Info("Applying manifest", "kind", obj.GetKind(), "name", obj.GetName())
 
-		if err != nil && apierrors.IsNotFound(err) {
-			logger.Info("Deploying Dependency", "Kind", obj.GetKind(), "Name", obj.GetName())
-			if err := r.Create(ctx, obj); err != nil {
-				return fmt.Errorf("failed to create %s %s: %w", obj.GetKind(), obj.GetName(), err)
-			}
-		} else if err != nil {
-			return fmt.Errorf("failed to get %s %s: %w", obj.GetKind(), obj.GetName(), err)
+		// Server-side apply: create or update in one call.
+		// Force: true means this controller wins conflicts with other field managers.
+		if err := r.Patch(ctx, obj, client.Apply, client.ForceOwnership,
+			client.FieldOwner("sovereign-sensor-controller")); err != nil {
+			return fmt.Errorf("failed to apply %s %s: %w", obj.GetKind(), obj.GetName(), err)
 		}
-		// Note: For a fully mature operator, you would add an 'else' block here to Update()
-		// the object if it exists but differs from the embedded manifest.
+
 	}
 	return nil
 }

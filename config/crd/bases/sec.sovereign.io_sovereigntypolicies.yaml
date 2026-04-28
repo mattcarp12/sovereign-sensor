@@ -41,33 +41,50 @@ spec:
           spec:
             description: SovereigntyPolicySpec defines the desired state of SovereigntyPolicy
             properties:
-              action:
-                enum:
-                - allow
-                - log
-                - block
-                type: string
+              actions:
+                description: |-
+                  Actions defines what to do when a policy matches.
+                  Valid values: "log", "block-kill" (SIGKILL process), "block-noconn" (close connection)
+                items:
+                  type: string
+                type: array
               allowedCountries:
+                description: AllowedCountries defines the ISO-3166-1 alpha-2 country
+                  codes that are permitted
                 items:
                   type: string
                 type: array
               description:
+                description: Description provides human-readable context for the policy
                 type: string
-              namespaces:
+              disallowedCountries:
+                description: DisallowedCountries defines the ISO-3166-1 alpha-2 country
+                  codes that are explicitly blocked
                 items:
                   type: string
-                minItems: 1
+                type: array
+              namespaces:
+                description: Namespaces defines which Kubernetes namespaces this policy
+                  applies to
+                items:
+                  type: string
                 type: array
             required:
-            - action
-            - namespaces
+            - actions
             type: object
           status:
             description: SovereigntyPolicyStatus defines the observed state of SovereigntyPolicy
             properties:
+              discoveredViolatorIPs:
+                description: |-
+                  DiscoveredViolatorIPs is populated by the Data Plane Agent.
+                  The Reconciler uses this list to dynamically generate Tetragon TracingPolicies.
+                items:
+                  type: string
+                type: array
               state:
-                description: Represents the current state of the policy across the
-                  cluster (e.g., "Active", "Error")
+                description: State represents the current processing state of the
+                  policy
                 type: string
             type: object
         type: object

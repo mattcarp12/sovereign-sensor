@@ -1,5 +1,5 @@
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+# IMG ?= controller:latest
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -42,7 +42,7 @@ help: ## Display this help.
 # ─── Local Cluster & E2E Testing ──────────────────────────────────────────────
 
 CLUSTER_NAME ?= sovereign-test
-IMAGE_NAME ?= sovereign-sensor:latest
+AGENT_IMAGE ?= sovereign-sensor-agent:dev
 
 .PHONY: cluster-up
 cluster-up: ## Spin up the local Kind cluster
@@ -54,15 +54,16 @@ cluster-down: ## Tear down the local Kind cluster
 	@echo "🗑️ Destroying Kind cluster..."
 	kind delete cluster --name $(CLUSTER_NAME)
 
-.PHONY: docker-build
-docker-build: ## Build the eBPF agent Docker image
-	@echo "🔨 Building agent image..."
-	docker build -t $(IMAGE_NAME) .
+.PHONY: docker-build-agent
+docker-build-agent: ## Build the eBPF agent Docker image
+	@echo "🔨 Building Agent Data Plane image..."
+	$(CONTAINER_TOOL) build -f agent.Dockerfile -t $(AGENT_IMAGE) .
 
 .PHONY: kind-load
-kind-load: docker-build ## Load the agent image into Kind
-	@echo "📦 Loading agent image into Kind..."
-	kind load docker-image $(IMAGE_NAME) --name $(CLUSTER_NAME)
+kind-load: docker-build-agent docker-build ## Load the agent image into Kind
+	@echo "📦 Loading Control Plane and Data Plane images into Kind..."
+	kind load docker-image ${IMG} --name $(CLUSTER_NAME)
+	kind load docker-image $(AGENT_IMAGE) --name $(CLUSTER_NAME)
 
 ##@ Development
 
@@ -165,9 +166,12 @@ run: manifests generate fmt vet build-frontend ## Run a controller from your hos
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
+
+IMG ?= sovereign-controller:dev
+
 .PHONY: docker-build
 docker-build: build-frontend ## Build docker image with the manager.
-	@echo "🔨 Building agent image..."
+	@echo "🔨 Building controller image..."
 	$(CONTAINER_TOOL) build -t ${IMG} .
 
 .PHONY: docker-push

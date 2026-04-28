@@ -8,31 +8,39 @@ import (
 type Action string
 
 const (
-	ActionAllow Action = "allow"
-	ActionLog   Action = "log"
-	ActionBlock Action = "block"
+	ActionAllow       Action = "allow"
+	ActionLog         Action = "log"
+	ActionBlock       Action = "block-kill"
+	ActionBlockNoConn Action = "block-noconn"
 )
 
 // SovereigntyPolicySpec defines the desired state of SovereigntyPolicy
 type SovereigntyPolicySpec struct {
-	// +kubebuilder:validation:Required
-	Action Action `json:"action"`
+	// Actions defines what to do when a policy matches.
+	// Valid values: "log", "block-kill" (SIGKILL process), "block-noconn" (close connection)
+	Actions []string `json:"actions"`
 
-	// +kubebuilder:validation:MinItems=1
-	Namespaces []string `json:"namespaces"`
+	// Namespaces defines which Kubernetes namespaces this policy applies to
+	Namespaces []string `json:"namespaces,omitempty"`
 
-	// +optional
+	// Description provides human-readable context for the policy
+	Description string `json:"description,omitempty"`
+
+	// AllowedCountries defines the ISO-3166-1 alpha-2 country codes that are permitted
 	AllowedCountries []string `json:"allowedCountries,omitempty"`
 
-	// +optional
-	Description string `json:"description,omitempty"`
+	// DisallowedCountries defines the ISO-3166-1 alpha-2 country codes that are explicitly blocked
+	DisallowedCountries []string `json:"disallowedCountries,omitempty"`
 }
 
 // SovereigntyPolicyStatus defines the observed state of SovereigntyPolicy
 type SovereigntyPolicyStatus struct {
-	// Represents the current state of the policy across the cluster (e.g., "Active", "Error")
-	// +optional
+	// State represents the current processing state of the policy
 	State string `json:"state,omitempty"`
+
+	// DiscoveredViolatorIPs is populated by the Data Plane Agent.
+	// The Reconciler uses this list to dynamically generate Tetragon TracingPolicies.
+	DiscoveredViolatorIPs []string `json:"discoveredViolatorIPs,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -5,46 +5,8 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - ""
-  resources:
-  - serviceaccounts
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps
-  resources:
-  - daemonsets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - clusterrolebindings
-  - clusterroles
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
   - sec.sovereign.io
   resources:
-  - sovereignsensors
   - sovereigntypolicies
   verbs:
   - create
@@ -57,14 +19,12 @@ rules:
 - apiGroups:
   - sec.sovereign.io
   resources:
-  - sovereignsensors/finalizers
   - sovereigntypolicies/finalizers
   verbs:
   - update
 - apiGroups:
   - sec.sovereign.io
   resources:
-  - sovereignsensors/status
   - sovereigntypolicies/status
   verbs:
   - get
