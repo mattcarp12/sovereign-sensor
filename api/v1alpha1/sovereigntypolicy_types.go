@@ -4,7 +4,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// +kubebuilder:validation:Enum=allow;log;block
+// +kubebuilder:validation:Enum=allow;log;block-kill;block-noconn
 type Action string
 
 const (
@@ -35,18 +35,22 @@ type SovereigntyPolicySpec struct {
 
 // SovereigntyPolicyStatus defines the observed state of SovereigntyPolicy
 type SovereigntyPolicyStatus struct {
-	// State represents the current processing state of the policy
-	State string `json:"state,omitempty"`
+	// Conditions represent the latest available observations of an object's state
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 
 	// DiscoveredViolatorIPs is populated by the Data Plane Agent.
 	// The Reconciler uses this list to dynamically generate Tetragon TracingPolicies.
+	// +listType=set
 	DiscoveredViolatorIPs []string `json:"discoveredViolatorIPs,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster,shortName=sp
-
 // SovereigntyPolicy is the Schema for the sovereigntypolicies API
 type SovereigntyPolicy struct {
 	metav1.TypeMeta   `json:",inline"`

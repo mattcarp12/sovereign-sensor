@@ -19,6 +19,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
@@ -39,11 +40,27 @@ func main() {
 	// 1. Setup K8s Client & Scheme
 	scheme := runtime.NewScheme()
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
-
 	k8sConfig := config.GetConfigOrDie()
 	k8sClient, err := client.New(k8sConfig, client.Options{Scheme: scheme})
 	if err != nil {
 		slog.Error("Failed to create K8s client", "err", err)
+		os.Exit(1)
+	}
+
+	k8sCache, err := cache.New(k8sConfig, cache.Options{Scheme: scheme})
+	if err != nil {
+		slog.Error("Failed to create K8s cache", "err", err)
+		os.Exit(1)
+	}
+
+	// Start the Cache in the background and wait for the initial sync
+	go func() {
+		if err := k8sCache.Start(ctx); err != nil {
+			slog.Error("Failed to start K8s cache", "err", err)
+		}
+	}()
+	if !k8sCache.WaitForCacheSync(ctx) {
+		slog.Error("Failed to sync K8s cache")
 		os.Exit(1)
 	}
 
@@ -61,7 +78,7 @@ func main() {
 
 	// 3. Start Background Processes
 	go metrics.StartMetricsServer(":9091")
-	go k8s.WatchPolicies(ctx, k8sClient, matcher)
+	go k8s.WatchPolicies(ctx, k8sCache, matcher)
 
 	eventsChan := make(chan event.SovereignEvent, 1000)
 	serverAddr := os.Getenv("TETRAGON_SERVER")
@@ -106,8 +123,8 @@ func main() {
 
 			// If the policy requires blocking, report the IP to the Control Plane
 			for _, action := range verdict.Actions {
-				if action == "block-kill" || action == "block-noconn" {
-					if err := reporter.ReportViolator(ctx, verdict.PolicyName, ev.Namespace, ev.DestIP); err != nil {
+				if action == v1alpha1.ActionBlock || action == v1alpha1.ActionBlockNoConn {
+					if err := reporter.ReportViolator(ctx, verdict.PolicyName, ev.DestIP); err != nil {
 						slog.Error("Failed to report violator to K8s API", "err", err)
 					}
 					break

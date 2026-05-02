@@ -21,6 +21,7 @@ import (
 	"slices"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	secv1alpha1 "github.com/mattcarp12/sovereign-sensor/api/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // SovereigntyPolicyReconciler reconciles a SovereigntyPolicy object
@@ -110,13 +112,22 @@ func (r *SovereigntyPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 	}
 
-	// 4. Update the SovereigntyPolicy Status state
-	if policy.Status.State != "Active" {
-		policy.Status.State = "Active"
-		if err := r.Status().Update(ctx, &policy); err != nil {
-			logger.Error(err, "Failed to update SovereigntyPolicy status")
-			return ctrl.Result{}, err
-		}
+	// 4. Update the SovereigntyPolicy Status Condition
+	// We define what the "Ready" state means for our specific controller at this exact moment.
+	condition := metav1.Condition{
+		Type:    "Ready",
+		Status:  metav1.ConditionTrue,
+		Reason:  "Reconciled",
+		Message: "Policy successfully parsed and enforcement rules are active",
+	}
+
+	// meta.SetStatusCondition automatically handles timestamps, overwriting existing
+	// conditions of the same Type, and avoiding unnecessary updates if nothing changed.
+	meta.SetStatusCondition(&policy.Status.Conditions, condition)
+
+	if err := r.Status().Update(ctx, &policy); err != nil {
+		logger.Error(err, "Failed to update SovereigntyPolicy status conditions")
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
@@ -160,6 +171,7 @@ func (r *SovereigntyPolicyReconciler) buildTracingPolicy(policy *secv1alpha1.Sov
 		Kind:    "TracingPolicy",
 	})
 	tp.SetName(policy.Name + "-ebpf-rule")
+	tp.SetNamespace("kube-system")
 
 	// Convert the discovered IPs into /32 CIDRs for Tetragon
 	var ipValues []interface{}

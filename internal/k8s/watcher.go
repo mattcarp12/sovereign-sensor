@@ -3,40 +3,63 @@ package k8s
 import (
 	"context"
 	"log/slog"
-	"time"
 
 	secv1alpha1 "github.com/mattcarp12/sovereign-sensor/api/v1alpha1"
 	"github.com/mattcarp12/sovereign-sensor/internal/policy"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	k8scache "k8s.io/client-go/tools/cache"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 )
 
-// WatchPolicies polls the Kubernetes API for SovereigntyPolicies and updates the Matcher.
-// Note: While a true K8s Informer/Watch stream is slightly more efficient, 
-// a fast polling loop using the controller-runtime caching client is exceptionally 
-// lightweight and vastly simpler to implement without the full Manager framework.
-func WatchPolicies(ctx context.Context, c client.Client, matcher *policy.Matcher) {
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
+// WatchPolicies attaches to the controller-runtime cache Informer.
+// It receives instant push notifications from the K8s API server when policies change.
+func WatchPolicies(ctx context.Context, c cache.Cache, matcher *policy.Matcher) {
+	slog.Info("Starting native Kubernetes Informer for policies...")
 
-	slog.Info("Starting Kubernetes policy watcher...")
-
-	for {
-		select {
-		case <-ctx.Done():
-			slog.Info("Stopping K8s policy watcher")
-			return
-		case <-ticker.C:
-			var policyList secv1alpha1.SovereigntyPolicyList
-			
-			// Because 'c' is a controller-runtime caching client, this Get/List 
-			// is usually served directly from memory and doesn't hammer the API server.
-			if err := c.List(ctx, &policyList); err != nil {
-				slog.Error("Failed to fetch policies from K8s", "err", err)
-				continue
-			}
-
-			// Update the thread-safe matcher with the fresh state of the world
-			matcher.UpdatePolicies(policyList.Items)
-		}
+	// Request the informer for our specific CRD
+	informer, err := c.GetInformer(ctx, &secv1alpha1.SovereigntyPolicy{})
+	if err != nil {
+		slog.Error("Failed to get Informer", "err", err)
+		return
 	}
+
+	// Register the callback functions for the Watch events
+	_, err = informer.AddEventHandler(k8scache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			p := obj.(*secv1alpha1.SovereigntyPolicy)
+			matcher.UpsertPolicy(p)
+			slog.Info("Policy added to memory", "name", p.Name)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			p := newObj.(*secv1alpha1.SovereigntyPolicy)
+			matcher.UpsertPolicy(p)
+			slog.Info("Policy updated in memory", "name", p.Name)
+		},
+		DeleteFunc: func(obj interface{}) {
+			p, ok := obj.(*secv1alpha1.SovereigntyPolicy)
+			if !ok {
+				// Handle edge case where the watch disconnected right as the object was deleted
+				tombstone, ok := obj.(k8scache.DeletedFinalStateUnknown)
+				if !ok {
+					slog.Error("Failed to decode deleted object tombstone")
+					return
+				}
+				p, ok = tombstone.Obj.(*secv1alpha1.SovereigntyPolicy)
+				if !ok {
+					slog.Error("Tombstone contained unexpected object type")
+					return
+				}
+			}
+			matcher.RemovePolicy(p)
+			slog.Info("Policy removed from memory", "name", p.Name)
+		},
+	})
+
+	if err != nil {
+		slog.Error("Failed to add event handlers to Informer", "err", err)
+		return
+	}
+
+	// Block until context is cancelled
+	<-ctx.Done()
 }

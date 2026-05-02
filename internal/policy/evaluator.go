@@ -34,47 +34,51 @@ func (e *Evaluator) Evaluate(ev *event.SovereignEvent) Verdict {
 		return Verdict{Actions: []v1alpha1.Action{v1alpha1.ActionAllow}, Reason: "host process / no namespace"}
 	}
 
-	// Fetch the in-memory policy for this namespace
-	pol := e.matcher.Match(ev.Namespace)
-	if pol == nil {
+	// Fetch ALL policies that apply to this namespace
+	policies := e.matcher.Match(ev.Namespace)
+	if len(policies) == 0 {
 		return Verdict{Actions: []v1alpha1.Action{v1alpha1.ActionAllow}, Reason: "no policy for namespace"}
 	}
 
-	// 1. Explicit Deny (DisallowedCountries) always wins
-	for _, blocked := range pol.Spec.DisallowedCountries {
-		if blocked == country {
-			return Verdict{
-				Actions:    pol.Spec.Actions,
-				PolicyName: pol.Name,
-				Reason:     "country explicitly in disallowed list",
-				Violated:   true,
+	// EVALUATION CHAIN: The strictest policy (first violation encountered) wins.
+	for _, pol := range policies {
+		
+		// 1. Explicit Deny (DisallowedCountries)
+		for _, blocked := range pol.Spec.DisallowedCountries {
+			if blocked == country {
+				return Verdict{
+					Actions:    pol.Spec.Actions,
+					PolicyName: pol.Name,
+					Reason:     "country explicitly in disallowed list",
+					Violated:   true,
+				}
+			}
+		}
+
+		// 2. Implicit Deny (AllowedCountries defined, but not matched)
+		if len(pol.Spec.AllowedCountries) > 0 {
+			isAllowed := false
+			for _, allowed := range pol.Spec.AllowedCountries {
+				if allowed == country {
+					isAllowed = true
+					break
+				}
+			}
+			if !isAllowed {
+				return Verdict{
+					Actions:    pol.Spec.Actions,
+					PolicyName: pol.Name,
+					Reason:     "destination country not in allowlist",
+					Violated:   true,
+				}
 			}
 		}
 	}
 
-	// 2. Implicit Deny (AllowedCountries is defined, but country is not in it)
-	if len(pol.Spec.AllowedCountries) > 0 {
-		isAllowed := false
-		for _, allowed := range pol.Spec.AllowedCountries {
-			if allowed == country {
-				isAllowed = true
-				break
-			}
-		}
-		if !isAllowed {
-			return Verdict{
-				Actions:    pol.Spec.Actions,
-				PolicyName: pol.Name,
-				Reason:     "destination country not in allowlist",
-				Violated:   true,
-			}
-		}
-	}
-
-	// 3. Default Allow
+	// 3. Default Allow (If we survived all matching policies without a violation)
 	return Verdict{
 		Actions:    []v1alpha1.Action{v1alpha1.ActionAllow},
-		PolicyName: pol.Name,
-		Reason:     "policy permits country",
+		PolicyName: "multiple", // Optional: indicates it passed multiple policies
+		Reason:     "all applicable policies permit country",
 	}
 }

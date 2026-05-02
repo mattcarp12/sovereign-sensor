@@ -5,60 +5,55 @@ import (
 	"sync"
 
 	secv1alpha1 "github.com/mattcarp12/sovereign-sensor/api/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// PolicyReporter handles the feedback loop from the Agent back to the Control Plane
-type PolicyReporter struct {
-	K8sClient client.Client
-
-	// reportedIPs prevents the Agent from spamming the K8s API with the same IP
+type Reporter struct {
+	K8sClient   client.Client
 	reportedIPs map[string]bool
 	mu          sync.Mutex
 }
 
-func NewReporter(c client.Client) *PolicyReporter {
-	return &PolicyReporter{
+func NewReporter(c client.Client) *Reporter {
+	return &Reporter{
 		K8sClient:   c,
 		reportedIPs: make(map[string]bool),
 	}
 }
 
-// ReportViolator adds the discovered IP to the policy's status so the Operator can block it
-func (pr *PolicyReporter) ReportViolator(ctx context.Context, policyName, policyNamespace, violatorIP string) error {
+// ReportViolator uses Server-Side Apply (SSA) to atomically append an IP to the cluster-scoped policy.
+func (pr *Reporter) ReportViolator(ctx context.Context, policyName, violatorIP string) error {
+	// Local node deduplication
 	pr.mu.Lock()
-	if pr.reportedIPs[policyName+"/"+violatorIP] {
+	cacheKey := policyName + ":" + violatorIP
+	if pr.reportedIPs[cacheKey] {
 		pr.mu.Unlock()
-		return nil // We already reported this IP, skip API call
+		return nil
 	}
-	// Mark as reported locally to prevent duplicate concurrent API calls
-	pr.reportedIPs[policyName+"/"+violatorIP] = true
+	pr.reportedIPs[cacheKey] = true
 	pr.mu.Unlock()
 
-	// 1. Fetch the absolute latest version of the policy from K8s
-	var policy secv1alpha1.SovereigntyPolicy
-	if err := pr.K8sClient.Get(ctx, client.ObjectKey{Name: policyName, Namespace: policyNamespace}, &policy); err != nil {
-		return err
+	// Construct a partial object containing ONLY the data we want to merge
+	patchObj := &secv1alpha1.SovereigntyPolicy{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "sec.sovereign.io/v1alpha1",
+			Kind:       "SovereigntyPolicy",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: policyName,
+			// ABSOLUTELY NO NAMESPACE HERE
+		},
+		Status: secv1alpha1.SovereigntyPolicyStatus{
+			DiscoveredViolatorIPs: []string{violatorIP},
+		},
 	}
 
-	// 2. Check if another Agent on a different node already reported this IP
-	for _, existingIP := range policy.Status.DiscoveredViolatorIPs {
-		if existingIP == violatorIP {
-			return nil // Already handled globally
-		}
-	}
-
-	// 3. Append the new IP
-	policy.Status.DiscoveredViolatorIPs = append(policy.Status.DiscoveredViolatorIPs, violatorIP)
-
-	// 4. Update the Status subresource
-	if err := pr.K8sClient.Status().Update(ctx, &policy); err != nil {
-		// If update fails, remove from local cache so we try again on the next packet
-		pr.mu.Lock()
-		delete(pr.reportedIPs, policyName+"/"+violatorIP)
-		pr.mu.Unlock()
-		return err
-	}
-
-	return nil
+	return pr.K8sClient.Status().Patch(
+		ctx,
+		patchObj,
+		client.Apply,
+		client.FieldOwner("sovereign-sensor-agent"),
+		client.ForceOwnership,
+	)
 }
