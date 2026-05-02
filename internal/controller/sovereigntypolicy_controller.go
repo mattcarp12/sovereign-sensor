@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"slices"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -134,7 +135,7 @@ func (r *SovereigntyPolicyReconciler) buildTracingPolicy(policy *secv1alpha1.Sov
 	// 1. Determine the Kernel Action based on the new granular actions array
 	var tetragonAction map[string]interface{}
 
-	if hasAction(policy.Spec.Actions, "block-kill") {
+	if hasAction(policy.Spec.Actions, secv1alpha1.ActionBlock) {
 		tetragonAction = map[string]interface{}{"action": "Sigkill"}
 	} else if hasAction(policy.Spec.Actions, "block-noconn") {
 		tetragonAction = map[string]interface{}{
@@ -199,11 +200,6 @@ func (r *SovereigntyPolicyReconciler) buildTracingPolicy(policy *secv1alpha1.Sov
 }
 
 // hasAction is a helper to check if a specific action exists in the policy
-func hasAction(actions []string, target string) bool {
-	for _, a := range actions {
-		if a == target {
-			return true
-		}
-	}
-	return false
+func hasAction(actions []secv1alpha1.Action, target secv1alpha1.Action) bool {
+	return slices.Contains(actions, target)
 }

@@ -152,7 +152,7 @@ lint-config: golangci-lint ## Verify golangci-lint linter configuration
 
 .PHONY: build
 build: manifests generate fmt vet ## Build manager binary.
-	go build -o bin/manager cmd/main.go
+	go build -o bin/manager cmd/controller/main.go
 
 .PHONY: build-frontend
 build-frontend: ## Build the React SPA
@@ -161,7 +161,7 @@ build-frontend: ## Build the React SPA
 
 .PHONY: run
 run: manifests generate fmt vet build-frontend ## Run a controller from your host.
-	go run ./cmd/main.go
+	go run ./cmd/controller/main.go
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.

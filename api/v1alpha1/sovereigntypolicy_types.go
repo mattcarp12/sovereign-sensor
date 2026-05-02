@@ -18,7 +18,7 @@ const (
 type SovereigntyPolicySpec struct {
 	// Actions defines what to do when a policy matches.
 	// Valid values: "log", "block-kill" (SIGKILL process), "block-noconn" (close connection)
-	Actions []string `json:"actions"`
+	Actions []Action `json:"actions"`
 
 	// Namespaces defines which Kubernetes namespaces this policy applies to
 	Namespaces []string `json:"namespaces,omitempty"`

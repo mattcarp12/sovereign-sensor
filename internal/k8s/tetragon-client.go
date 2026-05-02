@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/cilium/tetragon/api/v1/tetragon"
-	"github.com/mattcarp12/sovereign-sensor/pkg/event"
+	"github.com/mattcarp12/sovereign-sensor/internal/event"
 )
 
 // StreamTetragonEvents manages a resilient connection to Tetragon and pipes normalized events to the channel.

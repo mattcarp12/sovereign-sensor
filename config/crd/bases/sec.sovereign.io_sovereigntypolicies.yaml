@@ -46,6 +46,10 @@ spec:
                   Actions defines what to do when a policy matches.
                   Valid values: "log", "block-kill" (SIGKILL process), "block-noconn" (close connection)
                 items:
+                  enum:
+                  - allow
+                  - log
+                  - block
                   type: string
                 type: array
               allowedCountries:

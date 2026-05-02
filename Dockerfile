@@ -11,9 +11,9 @@ RUN go mod download
 # (This is critical because it copies the pre-built React frontend in internal/api/dist!)
 COPY . .
 
-# Build the Operator binary targeting cmd/main.go
+# Build the Operator binary targeting cmd/controller/main.go
 # Name it 'manager' so it matches the Kubernetes Deployment YAML
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o manager cmd/main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o manager cmd/controller/main.go
 
 # ─── Stage 2: The Minimal Runtime Image ───────────────────────────────────────
 FROM alpine:3.19

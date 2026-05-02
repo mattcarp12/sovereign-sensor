@@ -177,7 +177,7 @@ func (in *SovereigntyPolicySpec) DeepCopyInto(out *SovereigntyPolicySpec) {
 	*out = *in
 	if in.Actions != nil {
 		in, out := &in.Actions, &out.Actions
-		*out = make([]string, len(*in))
+		*out = make([]Action, len(*in))
 		copy(*out, *in)
 	}
 	if in.Namespaces != nil {
