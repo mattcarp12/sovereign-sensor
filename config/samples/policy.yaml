@@ -1,0 +1,14 @@
+apiVersion: sec.sovereign.io/v1alpha1
+kind: SovereigntyPolicy
+metadata:
+  name: block-russia
+spec:
+  # Log the violation
+  actions: 
+    - log
+  # Apply this policy to the default namespace (where the violator pod lives)
+  namespaces:
+    - default
+  disallowedCountries:
+    - RU
+  description: "Dev policy to test blocking Russian IP space"

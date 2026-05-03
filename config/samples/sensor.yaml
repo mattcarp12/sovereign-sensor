@@ -1,0 +1,8 @@
+apiVersion: sec.sovereign.io/v1alpha1
+kind: SovereignSensor
+metadata:
+  name: main-sensor
+spec:
+  targetNamespace: sovereign-sensor-system
+  logLevel: "debug"
+  deployTetragon: true

@@ -17,8 +17,13 @@ import (
 	"github.com/mattcarp12/sovereign-sensor/internal/policy"
 	"github.com/prometheus/client_golang/prometheus"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -40,6 +45,7 @@ func main() {
 	// 1. Setup K8s Client & Scheme
 	scheme := runtime.NewScheme()
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	k8sConfig := config.GetConfigOrDie()
 	k8sClient, err := client.New(k8sConfig, client.Options{Scheme: scheme})
 	if err != nil {
@@ -52,6 +58,18 @@ func main() {
 		slog.Error("Failed to create K8s cache", "err", err)
 		os.Exit(1)
 	}
+
+	// Set up the standard Kubernetes Clientset for the Broadcaster
+	clientset, err := kubernetes.NewForConfig(k8sConfig)
+	if err != nil {
+		slog.Error("Failed to create K8s clientset", "err", err)
+		os.Exit(1)
+	}
+
+	// Initialize the Event Broadcaster
+	broadcaster := record.NewBroadcaster()
+	broadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: clientset.CoreV1().Events("")})
+	recorder := broadcaster.NewRecorder(scheme, corev1.EventSource{Component: "sovereign-sensor-agent"})
 
 	// Start the Cache in the background and wait for the initial sync
 	go func() {
@@ -74,7 +92,7 @@ func main() {
 
 	matcher := policy.NewMatcher()
 	evaluator := policy.NewEvaluator(matcher) // No longer takes a logger
-	reporter := policy.NewReporter(k8sClient)
+	reporter := policy.NewPolicyReporter(k8sClient, recorder)
 
 	// 3. Start Background Processes
 	go metrics.StartMetricsServer(":9091")
@@ -123,6 +141,8 @@ func main() {
 
 			// If the policy requires blocking, report the IP to the Control Plane
 			for _, action := range verdict.Actions {
+				// Fire native kubernetes event
+				reporter.EmitViolationEvent(ev, verdict.PolicyName, string(action))
 				if action == v1alpha1.ActionBlock || action == v1alpha1.ActionBlockNoConn {
 					if err := reporter.ReportViolator(ctx, verdict.PolicyName, ev.DestIP); err != nil {
 						slog.Error("Failed to report violator to K8s API", "err", err)

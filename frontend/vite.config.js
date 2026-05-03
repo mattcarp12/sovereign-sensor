@@ -8,5 +8,14 @@ export default defineConfig({
   build: {
     outDir: '../internal/api/dist', // Output to the Go server's static directory
     emptyOutDir: true, // Clean the output directory before building
+  },
+  server: {
+    proxy: {
+      // Any request starting with /api will be forwarded to our port-forwarded Go server
+      '/api': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+      }
+    }
   }
 })

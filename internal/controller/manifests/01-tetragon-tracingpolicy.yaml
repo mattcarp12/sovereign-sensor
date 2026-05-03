@@ -2,6 +2,7 @@ apiVersion: cilium.io/v1alpha1
 kind: TracingPolicy
 metadata:
   name: sovereign-tcp-monitor
+  namespace: kube-system
 spec:
   kprobes:
   - call: "tcp_connect"

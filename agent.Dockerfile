@@ -6,8 +6,8 @@ COPY go.mod go.sum ./
 RUN go mod download
 # Copy Code
 COPY cmd/agent/ cmd/agent/
-COPY pkg/ pkg/
 COPY internal/ internal/
+COPY api/ api/
 # Build
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o agent cmd/agent/main.go
 

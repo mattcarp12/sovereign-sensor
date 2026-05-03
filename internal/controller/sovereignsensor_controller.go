@@ -17,10 +17,7 @@ limitations under the License.
 package controller
 
 import (
-	"bytes"
 	"context"
-	"fmt"
-	"io"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -29,17 +26,25 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	_ "embed"
 
 	secv1alpha1 "github.com/mattcarp12/sovereign-sensor/api/v1alpha1"
 )
+
+// +kubebuilder:rbac:groups=sec.sovereign.io,resources=sovereignsensors,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=sec.sovereign.io,resources=sovereignsensors/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=sec.sovereign.io,resources=sovereignsensors/finalizers,verbs=update
+// +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch;update
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles;clusterrolebindings,verbs=get;list;watch;create;update;patch;delete;bind;escalate
+// +kubebuilder:rbac:groups=cilium.io,resources=tracingpolicies,verbs=get;list;watch;create;update;patch;delete
 
 // SovereignSensorReconciler reconciles a SovereignSensor object
 type SovereignSensorReconciler struct {
@@ -47,24 +52,7 @@ type SovereignSensorReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-//go:embed manifests/tetragon.yaml
-var tetragonManifests []byte
-
-// +kubebuilder:rbac:groups=sec.sovereign.io,resources=sovereignsensors,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=sec.sovereign.io,resources=sovereignsensors/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=sec.sovereign.io,resources=sovereignsensors/finalizers,verbs=update
-// +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles;clusterrolebindings,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=sec.sovereign.io,resources=sovereigntypolicies,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=sec.sovereign.io,resources=sovereigntypolicies/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=sec.sovereign.io,resources=sovereigntypolicies/finalizers,verbs=update
-// +kubebuilder:rbac:groups=cilium.io,resources=tracingpolicies,verbs=get;list;watch;create;update;patch;delete
-//
-// Reconcile is part of the main kubernetes reconciliation loop.
 func (r *SovereignSensorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
-
 	// 1. Fetch the SovereignSensor instance
 	var sensor secv1alpha1.SovereignSensor
 	if err := r.Get(ctx, req.NamespacedName, &sensor); err != nil {
@@ -104,13 +92,10 @@ func (r *SovereignSensorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
-	// 1.5 Auto-Deploy Tetragon Dependency
-	if sensor.Spec.DeployTetragon {
-		logger.Info("DeployTetragon is true, verifying Tetragon installation...")
-		if err := r.applyManifests(ctx, tetragonManifests); err != nil {
-			logger.Error(err, "Failed to deploy Tetragon dependency")
-			return ctrl.Result{}, err
-		}
+	// 1.5 Auto-Deploy Baseline Tracing Policy
+	baselinePolicy := r.baselineTracingPolicy(&sensor)
+	if err := r.Patch(ctx, baselinePolicy, client.Apply, client.ForceOwnership, client.FieldOwner("sovereign-sensor-controller")); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	// 2. Define all desired resources
@@ -227,6 +212,11 @@ func (r *SovereignSensorReconciler) agentClusterRole(sensor *secv1alpha1.Soverei
 				Resources: []string{"sovereigntypolicies/status"},
 				Verbs:     []string{"get", "update", "patch"},
 			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"events"},
+				Verbs:     []string{"create", "patch", "update"},
+			},
 		},
 	}
 }
@@ -251,38 +241,32 @@ func (r *SovereignSensorReconciler) agentClusterRoleBinding(sensor *secv1alpha1.
 	}
 }
 
-// applyManifests parses a multi-document YAML and applies each object to the cluster.
-func (r *SovereignSensorReconciler) applyManifests(ctx context.Context, yamlData []byte) error {
-	logger := log.FromContext(ctx)
-	decoder := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(yamlData), 4096)
+// baselineTracingPolicy generates the native Kubernetes object for Tetragon's TCP monitor
+func (r *SovereignSensorReconciler) baselineTracingPolicy(sensor *secv1alpha1.SovereignSensor) *unstructured.Unstructured {
+	tp := &unstructured.Unstructured{}
+	tp.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "cilium.io",
+		Version: "v1alpha1",
+		Kind:    "TracingPolicy",
+	})
+	tp.SetName("sovereign-tcp-monitor")
+	tp.SetNamespace("kube-system") // Tetragon's default namespace
 
-	for {
-		// We use unstructured.Unstructured because we don't have the Go types
-		// for every possible Kubernetes object (like Tetragon's custom CRDs).
-		obj := &unstructured.Unstructured{}
-		if err := decoder.Decode(obj); err != nil {
-			if err == io.EOF {
-				break // End of file
-			}
-			return fmt.Errorf("failed to decode yaml: %w", err)
-		}
-
-		// Skip empty objects (sometimes caused by trailing --- in YAML)
-		if len(obj.Object) == 0 {
-			continue
-		}
-
-		logger.Info("Applying manifest", "kind", obj.GetKind(), "name", obj.GetName())
-
-		// Server-side apply: create or update in one call.
-		// Force: true means this controller wins conflicts with other field managers.
-		if err := r.Patch(ctx, obj, client.Apply, client.ForceOwnership,
-			client.FieldOwner("sovereign-sensor-controller")); err != nil {
-			return fmt.Errorf("failed to apply %s %s: %w", obj.GetKind(), obj.GetName(), err)
-		}
-
+	tp.Object["spec"] = map[string]interface{}{
+		"kprobes": []interface{}{
+			map[string]interface{}{
+				"call":    "tcp_connect",
+				"syscall": false,
+				"args": []interface{}{
+					map[string]interface{}{
+						"index": 0,
+						"type":  "sock",
+					},
+				},
+			},
+		},
 	}
-	return nil
+	return tp
 }
 
 // SetupWithManager sets up the controller with the Manager.

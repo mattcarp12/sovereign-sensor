@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: violator
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: violator
+  template:
+    metadata:
+      labels:
+        app: violator
+    spec:
+      containers:
+        - name: curler
+          image: alpine/curl
+          command: [ "/bin/sh", "-c" ]
+          args:
+            - |
+              while true; do
+                echo "Attempting allowed connection (GitHub US)..."
+                curl -m 2 -s https://github.com > /dev/null
+                
+                echo "Attempting violation connection (Yandex RU)..."
+                curl -m 2 -s https://yandex.ru > /dev/null
+                
+                sleep 3
+              done

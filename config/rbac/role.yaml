@@ -5,8 +5,68 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cilium.io
+  resources:
+  - tracingpolicies
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - clusterrolebindings
+  - clusterroles
+  verbs:
+  - bind
+  - create
+  - delete
+  - escalate
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - sec.sovereign.io
   resources:
+  - sovereignsensors
   - sovereigntypolicies
   verbs:
   - create
@@ -19,12 +79,14 @@ rules:
 - apiGroups:
   - sec.sovereign.io
   resources:
+  - sovereignsensors/finalizers
   - sovereigntypolicies/finalizers
   verbs:
   - update
 - apiGroups:
   - sec.sovereign.io
   resources:
+  - sovereignsensors/status
   - sovereigntypolicies/status
   verbs:
   - get
