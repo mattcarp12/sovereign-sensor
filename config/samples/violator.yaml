@@ -14,17 +14,29 @@ spec:
         app: violator
     spec:
       containers:
-        - name: curler
+        - name: russia-violator
           image: alpine/curl
           command: [ "/bin/sh", "-c" ]
           args:
             - |
               while true; do
-                echo "Attempting allowed connection (GitHub US)..."
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] Attempting allowed connection (GitHub US)..."
                 curl -m 2 -s https://github.com > /dev/null
                 
-                echo "Attempting violation connection (Yandex RU)..."
-                curl -m 2 -s https://yandex.ru > /dev/null
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] Attempting violation connection (Yandex RU)..."
+                RESPONSE=$(curl -m 2 -s -o /dev/null -w "Connected to: %{remote_ip} | Status: %{http_code}\n" https://yandex.ru)
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] Request result: $RESPONSE"
                 
+                sleep 3
+              done
+        - name: china-violator
+          image: alpine/curl
+          command: [ "/bin/sh", "-c" ]
+          args:
+            - |
+              while true; do
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] Attempting violation connection (Taobao CN)..."
+                RESPONSE=$(curl -m 2 -s -o /dev/null -w "Connected to: %{remote_ip} | Status: %{http_code}\n" https://taobao.cn)
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] Request result: $RESPONSE"
                 sleep 3
               done

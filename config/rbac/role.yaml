@@ -8,13 +8,6 @@ rules:
   - ""
   resources:
   - events
-  verbs:
-  - create
-  - patch
-  - update
-- apiGroups:
-  - ""
-  resources:
   - serviceaccounts
   verbs:
   - create

@@ -74,7 +74,7 @@ vendor-manifests: ## Download and template third-party manifests for embedding
 	@echo "✅ Vendored into hack/tetragon.yaml"
 
 .PHONY: dev
-dev: cluster-up manifests vendor-manifests build-frontend docker-build docker-build-agent kind-load install deploy ## Full local development setup
+dev: manifests vendor-manifests build-frontend docker-build docker-build-agent cluster-down cluster-up kind-load install deploy ## Full local development setup
 	@echo "⏳ Installing Tetragon $(TETRAGON_VERSION)..."
 	kubectl apply -f hack/tetragon.yaml
 	@echo "⚙️  Waiting for controller manager..."
@@ -83,7 +83,14 @@ dev: cluster-up manifests vendor-manifests build-frontend docker-build docker-bu
 	kubectl apply -f config/samples/sensor.yaml
 	kubectl apply -f config/samples/policy.yaml
 	kubectl apply -f config/samples/violator.yaml
-	@echo "✅ Development environment ready!"
+	@echo "Forwarding Port to access frontend..."
+	kubectl port-forward svc/sovereign-sensor-controller-manager-api -n sovereign-sensor-system 8080:8080
+# 	@echo "✅ Development environment ready!"
+
+
+.PHONY: zip
+zip:
+	zip -r ss.zip . -x ".devcontainer/*" ".github/*" "bin/*" "frontend/node_modules/*" "frontend/public/*" "internal/api/dist/*" "internal/geo/*.mmdb"
 
 # =============================================================================
 # Build

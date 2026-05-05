@@ -10,7 +10,7 @@ type Action string
 const (
 	ActionAllow       Action = "allow"
 	ActionLog         Action = "log"
-	ActionBlock       Action = "block-kill"
+	ActionBlockKill   Action = "block-kill"
 	ActionBlockNoConn Action = "block-noconn"
 )
 

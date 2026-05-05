@@ -49,6 +49,26 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Extract the full country name from the enriched event logs
+  const getBlockedCountries = () => {
+    const counts = {};
+    events.forEach(ev => {
+      // Use regex to pull the name out of the brackets e.g. "[China]"
+      const match = ev.message?.match(/\[(.*?)\]/);
+      if (match && match[1]) {
+        let countryName = match[1];
+
+        // Minor normalizations between MaxMind's names and world-atlas names
+        if (countryName === "United States") countryName = "United States of America";
+
+        counts[countryName] = (counts[countryName] || 0) + 1;
+      }
+    });
+    return counts;
+  };
+
+  const blockedCounts = getBlockedCountries();
+
   // CRUD: Create
   const handleCreatePolicy = async (e) => {
     e.preventDefault();
@@ -185,7 +205,8 @@ function App() {
                       <Geography
                         key={geo.rsmKey}
                         geography={geo}
-                        fill="#EAEAEC"
+                        // Match directly against the TopoJSON name property!
+                        fill={blockedCounts[geo.properties.name] ? "#ff4444" : "#EAEAEC"}
                         stroke="#D6D6DA"
                         strokeWidth={0.5}
                         style={{

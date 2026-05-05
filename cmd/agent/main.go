@@ -113,8 +113,9 @@ func main() {
 		timer := prometheus.NewTimer(metrics.EvaluationDuration)
 
 		if ev.DestIP != "unknown" {
-			if country, err := geoip.LookupCountry(ev.DestIP); err == nil {
-				ev.DestCountry = country
+			if iso, name, err := geoip.LookupCountry(ev.DestIP); err == nil {
+				ev.DestCountry = iso
+				ev.DestCountryName = name
 			}
 		}
 
@@ -135,6 +136,7 @@ func main() {
 				"namespace", ev.Namespace,
 				"dst_ip", ev.DestIP,
 				"dst_country", ev.DestCountry,
+				"dst_country_name", ev.DestCountryName,
 				"policy", verdict.PolicyName,
 				"actions", verdict.Actions,
 			)
@@ -143,7 +145,7 @@ func main() {
 			for _, action := range verdict.Actions {
 				// Fire native kubernetes event
 				reporter.EmitViolationEvent(ev, verdict.PolicyName, string(action))
-				if action == v1alpha1.ActionBlock || action == v1alpha1.ActionBlockNoConn {
+				if action == v1alpha1.ActionBlockKill || action == v1alpha1.ActionBlockNoConn {
 					if err := reporter.ReportViolator(ctx, verdict.PolicyName, ev.DestIP); err != nil {
 						slog.Error("Failed to report violator to K8s API", "err", err)
 					}

@@ -12,3 +12,18 @@ spec:
   disallowedCountries:
     - RU
   description: "Dev policy to test blocking Russian IP space"
+---
+apiVersion: sec.sovereign.io/v1alpha1
+kind: SovereigntyPolicy
+metadata:
+  name: block-china
+spec:
+  # Block the connection (i.e. close the file descriptor)
+  actions: 
+    - block-noconn
+  # Apply this policy to the default namespace (where the violator pod lives)
+  namespaces:
+    - default
+  disallowedCountries:
+    - CN
+  description: "Dev policy to test blocking Chinese IP space"

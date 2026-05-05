@@ -13,6 +13,8 @@
 - CI with passing tests
 - multi-arch container images. 
 - The two less obvious items here are the CRD and the Tetragon abstraction. A `SovereignPolicy` CRD lets users manage policies as native Kubernetes objects via `kubectl` — much better than a ConfigMap with YAML. The Tetragon abstraction is the CNCF committee's likely concern: right now Tetragon is a hard dependency. A `SensorBackend` interface with a Tetragon implementation (and a stub native eBPF implementation) makes the project defensibly independent.
+- Github release process
+- Helm distribution
 
 **Tier 4 — enterprise expectations**
 

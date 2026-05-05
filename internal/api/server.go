@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/fs"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"k8s.io/client-go/kubernetes"
@@ -57,48 +58,80 @@ func listPolicies(c client.Client) http.HandlerFunc {
 	}
 }
 
-// 2. POST /api/policies - Create a new SovereigntyPolicy
+// POST /api/policies
 func createPolicy(c client.Client) http.HandlerFunc {
+	// Pre-compile regex for K8s valid names (lowercase alphanumeric and hyphens)
+	nameRegex := regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
+
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse the JSON from React
 		var req struct {
 			Name      string `json:"name"`
 			Namespace string `json:"namespace"`
 			Country   string `json:"country"`
 			Action    string `json:"action"`
 		}
-		json.NewDecoder(r.Body).Decode(&req)
 
-		// Construct the Custom Resource
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
+			return
+		}
+
+		// --- STRICT INPUT VALIDATION ---
+		req.Name = strings.TrimSpace(req.Name)
+		if !nameRegex.MatchString(req.Name) {
+			http.Error(w, "Invalid name: must be lowercase alphanumeric and hyphens only", http.StatusBadRequest)
+			return
+		}
+		if req.Namespace == "" {
+			req.Namespace = "default" // Fallback safety
+		}
+		if len(req.Country) != 2 {
+			http.Error(w, "Invalid country code: must be exactly 2 characters (ISO Alpha-2)", http.StatusBadRequest)
+			return
+		}
+		req.Country = strings.ToUpper(req.Country)
+		if req.Action != "block-kill" && req.Action != "block-noconn" && req.Action != "log" {
+			http.Error(w, "Invalid action: must be block-kill, block-noconn, or log", http.StatusBadRequest)
+			return
+		}
+		// -------------------------------
+
 		policy := &secv1alpha1.SovereigntyPolicy{
 			ObjectMeta: metav1.ObjectMeta{Name: req.Name},
 			Spec: secv1alpha1.SovereigntyPolicySpec{
 				Namespaces:          []string{req.Namespace},
 				DisallowedCountries: []string{req.Country},
 				Actions:             []secv1alpha1.Action{secv1alpha1.Action(req.Action)},
-				Description:         "Generated via Web UI",
+				Description:         "Generated via Sovereign Sensor Web UI",
 			},
 		}
 
 		if err := c.Create(r.Context(), policy); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, "Failed to create policy in cluster: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+
 		w.WriteHeader(http.StatusCreated)
 	}
 }
 
-// 3. DELETE /api/policies/{name} - Delete a Policy
+// DELETE /api/policies/{name}
 func deletePolicy(c client.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		name := r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]
+		// Native Go 1.22 path extraction! No more string splitting.
+		name := r.PathValue("name")
+		if name == "" {
+			http.Error(w, "Policy name is required", http.StatusBadRequest)
+			return
+		}
 
 		policy := &secv1alpha1.SovereigntyPolicy{
 			ObjectMeta: metav1.ObjectMeta{Name: name},
 		}
 
-		if err := c.Delete(r.Context(), policy); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+		// client.IgnoreNotFound is great here. If it's already deleted, just return 200 OK.
+		if err := client.IgnoreNotFound(c.Delete(r.Context(), policy)); err != nil {
+			http.Error(w, "Failed to delete policy: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusOK)

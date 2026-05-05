@@ -146,9 +146,9 @@ func (r *SovereigntyPolicyReconciler) buildTracingPolicy(policy *secv1alpha1.Sov
 	// 1. Determine the Kernel Action based on the new granular actions array
 	var tetragonAction map[string]interface{}
 
-	if hasAction(policy.Spec.Actions, secv1alpha1.ActionBlock) {
+	if hasAction(policy.Spec.Actions, secv1alpha1.ActionBlockKill) {
 		tetragonAction = map[string]interface{}{"action": "Sigkill"}
-	} else if hasAction(policy.Spec.Actions, "block-noconn") {
+	} else if hasAction(policy.Spec.Actions, secv1alpha1.ActionBlockNoConn) {
 		tetragonAction = map[string]interface{}{
 			"action":   "Override",
 			"argError": -111, // Return ECONNREFUSED to the application

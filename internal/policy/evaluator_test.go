@@ -33,19 +33,19 @@ func makeEvaluator(policies ...v1alpha1.SovereigntyPolicy) *Evaluator {
 // ─── Short-circuit cases ──────────────────────────────────────────────────────
 
 func TestEvaluate_PrivateAddress(t *testing.T) {
-	eval := makeEvaluator(makePolicy("prod", []string{"prod"}, []string{"US"}, nil, []v1alpha1.Action{v1alpha1.ActionBlock}))
+	eval := makeEvaluator(makePolicy("prod", []string{"prod"}, []string{"US"}, nil, []v1alpha1.Action{v1alpha1.ActionBlockKill}))
 	got := eval.Evaluate(&event.SovereignEvent{Namespace: "prod", DestCountry: ""})
 	assertAllow(t, got, "private address")
 }
 
 func TestEvaluate_HostProcess(t *testing.T) {
-	eval := makeEvaluator(makePolicy("prod", []string{"prod"}, []string{"US"}, nil, []v1alpha1.Action{v1alpha1.ActionBlock}))
+	eval := makeEvaluator(makePolicy("prod", []string{"prod"}, []string{"US"}, nil, []v1alpha1.Action{v1alpha1.ActionBlockKill}))
 	got := eval.Evaluate(&event.SovereignEvent{Namespace: "", DestCountry: "RU"})
 	assertAllow(t, got, "host process / no namespace")
 }
 
 func TestEvaluate_NoPolicyForNamespace(t *testing.T) {
-	eval := makeEvaluator(makePolicy("prod", []string{"prod"}, []string{"US"}, nil, []v1alpha1.Action{v1alpha1.ActionBlock}))
+	eval := makeEvaluator(makePolicy("prod", []string{"prod"}, []string{"US"}, nil, []v1alpha1.Action{v1alpha1.ActionBlockKill}))
 	got := eval.Evaluate(&event.SovereignEvent{Namespace: "unmonitored", DestCountry: "RU"})
 	assertAllow(t, got, "no policy for namespace")
 }
@@ -53,9 +53,9 @@ func TestEvaluate_NoPolicyForNamespace(t *testing.T) {
 // ─── Single-policy: explicit deny ────────────────────────────────────────────
 
 func TestEvaluate_ExplicitDeny_Block(t *testing.T) {
-	eval := makeEvaluator(makePolicy("prod", []string{"prod"}, nil, []string{"RU", "CN"}, []v1alpha1.Action{v1alpha1.ActionBlock}))
+	eval := makeEvaluator(makePolicy("prod", []string{"prod"}, nil, []string{"RU", "CN"}, []v1alpha1.Action{v1alpha1.ActionBlockKill}))
 	got := eval.Evaluate(&event.SovereignEvent{Namespace: "prod", DestCountry: "RU"})
-	assertViolation(t, got, []v1alpha1.Action{v1alpha1.ActionBlock}, "country explicitly in disallowed list")
+	assertViolation(t, got, []v1alpha1.Action{v1alpha1.ActionBlockKill}, "country explicitly in disallowed list")
 }
 
 func TestEvaluate_ExplicitDeny_Log(t *testing.T) {
@@ -73,9 +73,9 @@ func TestEvaluate_ExplicitDeny_BlockNoConn(t *testing.T) {
 // ─── Single-policy: implicit deny ────────────────────────────────────────────
 
 func TestEvaluate_ImplicitDeny_NotInAllowlist(t *testing.T) {
-	eval := makeEvaluator(makePolicy("prod", []string{"prod"}, []string{"US", "CA"}, nil, []v1alpha1.Action{v1alpha1.ActionBlock}))
+	eval := makeEvaluator(makePolicy("prod", []string{"prod"}, []string{"US", "CA"}, nil, []v1alpha1.Action{v1alpha1.ActionBlockKill}))
 	got := eval.Evaluate(&event.SovereignEvent{Namespace: "prod", DestCountry: "GB"})
-	assertViolation(t, got, []v1alpha1.Action{v1alpha1.ActionBlock}, "destination country not in allowlist")
+	assertViolation(t, got, []v1alpha1.Action{v1alpha1.ActionBlockKill}, "destination country not in allowlist")
 }
 
 func TestEvaluate_ImplicitDeny_MultipleActions(t *testing.T) {
@@ -83,16 +83,16 @@ func TestEvaluate_ImplicitDeny_MultipleActions(t *testing.T) {
 	eval := makeEvaluator(makePolicy("prod", []string{"prod"},
 		[]string{"US"},
 		nil,
-		[]v1alpha1.Action{v1alpha1.ActionLog, v1alpha1.ActionBlock},
+		[]v1alpha1.Action{v1alpha1.ActionLog, v1alpha1.ActionBlockKill},
 	))
 	got := eval.Evaluate(&event.SovereignEvent{Namespace: "prod", DestCountry: "DE"})
-	assertViolation(t, got, []v1alpha1.Action{v1alpha1.ActionLog, v1alpha1.ActionBlock}, "destination country not in allowlist")
+	assertViolation(t, got, []v1alpha1.Action{v1alpha1.ActionLog, v1alpha1.ActionBlockKill}, "destination country not in allowlist")
 }
 
 // ─── Single-policy: allow ─────────────────────────────────────────────────────
 
 func TestEvaluate_Allow_InAllowlist(t *testing.T) {
-	eval := makeEvaluator(makePolicy("prod", []string{"prod"}, []string{"US", "CA"}, nil, []v1alpha1.Action{v1alpha1.ActionBlock}))
+	eval := makeEvaluator(makePolicy("prod", []string{"prod"}, []string{"US", "CA"}, nil, []v1alpha1.Action{v1alpha1.ActionBlockKill}))
 	got := eval.Evaluate(&event.SovereignEvent{Namespace: "prod", DestCountry: "US"})
 	assertAllow(t, got, "all applicable policies permit country")
 }
@@ -119,22 +119,22 @@ func TestEvaluate_ExplicitDenyBeatsAllowlist(t *testing.T) {
 	eval := makeEvaluator(makePolicy("confused", []string{"prod"},
 		[]string{"US", "CN"},
 		[]string{"CN"},
-		[]v1alpha1.Action{v1alpha1.ActionBlock},
+		[]v1alpha1.Action{v1alpha1.ActionBlockKill},
 	))
 	got := eval.Evaluate(&event.SovereignEvent{Namespace: "prod", DestCountry: "CN"})
-	assertViolation(t, got, []v1alpha1.Action{v1alpha1.ActionBlock}, "country explicitly in disallowed list")
+	assertViolation(t, got, []v1alpha1.Action{v1alpha1.ActionBlockKill}, "country explicitly in disallowed list")
 }
 
 // ─── Wildcard namespace ───────────────────────────────────────────────────────
 
 func TestEvaluate_WildcardPolicy_Deny(t *testing.T) {
-	eval := makeEvaluator(makePolicy("catch-all", []string{"*"}, []string{"US"}, nil, []v1alpha1.Action{v1alpha1.ActionBlock}))
+	eval := makeEvaluator(makePolicy("catch-all", []string{"*"}, []string{"US"}, nil, []v1alpha1.Action{v1alpha1.ActionBlockKill}))
 	got := eval.Evaluate(&event.SovereignEvent{Namespace: "any-random-ns", DestCountry: "DE"})
-	assertViolation(t, got, []v1alpha1.Action{v1alpha1.ActionBlock}, "destination country not in allowlist")
+	assertViolation(t, got, []v1alpha1.Action{v1alpha1.ActionBlockKill}, "destination country not in allowlist")
 }
 
 func TestEvaluate_WildcardPolicy_Allow(t *testing.T) {
-	eval := makeEvaluator(makePolicy("catch-all", []string{"*"}, []string{"US"}, nil, []v1alpha1.Action{v1alpha1.ActionBlock}))
+	eval := makeEvaluator(makePolicy("catch-all", []string{"*"}, []string{"US"}, nil, []v1alpha1.Action{v1alpha1.ActionBlockKill}))
 	got := eval.Evaluate(&event.SovereignEvent{Namespace: "some-other-ns", DestCountry: "US"})
 	assertAllow(t, got, "all applicable policies permit country")
 }
@@ -145,7 +145,7 @@ func TestEvaluate_MultiPolicy_NamespaceAndWildcard_Deny(t *testing.T) {
 	// Wildcard allows everything; namespace-specific policy blocks RU.
 	// The namespace-specific block must win.
 	wildcard := makePolicy("catch-all", []string{"*"}, nil, nil, []v1alpha1.Action{v1alpha1.ActionLog})
-	specific := makePolicy("prod-policy", []string{"prod"}, nil, []string{"RU"}, []v1alpha1.Action{v1alpha1.ActionBlock})
+	specific := makePolicy("prod-policy", []string{"prod"}, nil, []string{"RU"}, []v1alpha1.Action{v1alpha1.ActionBlockKill})
 	eval := makeEvaluator(wildcard, specific)
 	got := eval.Evaluate(&event.SovereignEvent{Namespace: "prod", DestCountry: "RU"})
 	assertViolated(t, got)
@@ -153,7 +153,7 @@ func TestEvaluate_MultiPolicy_NamespaceAndWildcard_Deny(t *testing.T) {
 
 func TestEvaluate_MultiPolicy_BothAllow(t *testing.T) {
 	// Two policies cover the same namespace; country passes both.
-	p1 := makePolicy("p1", []string{"shared"}, []string{"US", "DE"}, nil, []v1alpha1.Action{v1alpha1.ActionBlock})
+	p1 := makePolicy("p1", []string{"shared"}, []string{"US", "DE"}, nil, []v1alpha1.Action{v1alpha1.ActionBlockKill})
 	p2 := makePolicy("p2", []string{"shared"}, nil, []string{"RU"}, []v1alpha1.Action{v1alpha1.ActionLog})
 	eval := makeEvaluator(p1, p2)
 	got := eval.Evaluate(&event.SovereignEvent{Namespace: "shared", DestCountry: "US"})
@@ -164,7 +164,7 @@ func TestEvaluate_MultiPolicy_OneAllowOneImplicitDeny(t *testing.T) {
 	// p1 has no allowlist (permissive); p2 has allowlist that excludes DE.
 	// DE must be denied because p2 blocks it.
 	p1 := makePolicy("p1", []string{"shared"}, nil, nil, []v1alpha1.Action{v1alpha1.ActionLog})
-	p2 := makePolicy("p2", []string{"shared"}, []string{"US"}, nil, []v1alpha1.Action{v1alpha1.ActionBlock})
+	p2 := makePolicy("p2", []string{"shared"}, []string{"US"}, nil, []v1alpha1.Action{v1alpha1.ActionBlockKill})
 	eval := makeEvaluator(p1, p2)
 	got := eval.Evaluate(&event.SovereignEvent{Namespace: "shared", DestCountry: "DE"})
 	assertViolated(t, got)

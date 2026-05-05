@@ -178,7 +178,7 @@ var _ = Describe("SovereigntyPolicy Controller", func() {
 				ObjectMeta: metav1.ObjectMeta{Name: "block-no-ips"},
 				Spec: secv1alpha1.SovereigntyPolicySpec{
 					Namespaces:          []string{"prod"},
-					Actions:             []secv1alpha1.Action{secv1alpha1.ActionBlock},
+					Actions:             []secv1alpha1.Action{secv1alpha1.ActionBlockKill},
 					DisallowedCountries: []string{"RU"},
 				},
 				// Status.DiscoveredViolatorIPs is empty by default
@@ -201,7 +201,7 @@ var _ = Describe("SovereigntyPolicy Controller", func() {
 				ObjectMeta: metav1.ObjectMeta{Name: "block-kill-policy"},
 				Spec: secv1alpha1.SovereigntyPolicySpec{
 					Namespaces:          []string{"prod"},
-					Actions:             []secv1alpha1.Action{secv1alpha1.ActionBlock},
+					Actions:             []secv1alpha1.Action{secv1alpha1.ActionBlockKill},
 					DisallowedCountries: []string{"RU"},
 				},
 			}
@@ -276,7 +276,7 @@ var _ = Describe("SovereigntyPolicy Controller", func() {
 				ObjectMeta: metav1.ObjectMeta{Name: "update-ips"},
 				Spec: secv1alpha1.SovereigntyPolicySpec{
 					Namespaces: []string{"prod"},
-					Actions:    []secv1alpha1.Action{secv1alpha1.ActionBlock},
+					Actions:    []secv1alpha1.Action{secv1alpha1.ActionBlockKill},
 				},
 			}
 			createPolicy(ctx, policy)
@@ -320,7 +320,7 @@ var _ = Describe("SovereigntyPolicy Controller", func() {
 				ObjectMeta: metav1.ObjectMeta{Name: "downgrade-policy"},
 				Spec: secv1alpha1.SovereigntyPolicySpec{
 					Namespaces: []string{"prod"},
-					Actions:    []secv1alpha1.Action{secv1alpha1.ActionBlock},
+					Actions:    []secv1alpha1.Action{secv1alpha1.ActionBlockKill},
 				},
 			}
 			createPolicy(ctx, policy)
@@ -353,7 +353,7 @@ var _ = Describe("SovereigntyPolicy Controller", func() {
 				ObjectMeta: metav1.ObjectMeta{Name: "cleared-ips"},
 				Spec: secv1alpha1.SovereigntyPolicySpec{
 					Namespaces: []string{"prod"},
-					Actions:    []secv1alpha1.Action{secv1alpha1.ActionBlock},
+					Actions:    []secv1alpha1.Action{secv1alpha1.ActionBlockKill},
 				},
 			}
 			createPolicy(ctx, policy)

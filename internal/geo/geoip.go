@@ -26,7 +26,8 @@ type GeoIP struct {
 // so we pay no cost for the fields we don't need.
 type geoRecord struct {
 	Country struct {
-		ISOCode string `maxminddb:"iso_code"` // e.g. "DE", "US", "IE"
+		ISOCode string            `maxminddb:"iso_code"`
+		Names   map[string]string `maxminddb:"names"`
 	} `maxminddb:"country"`
 }
 
@@ -39,32 +40,33 @@ func NewGeoIP() (*GeoIP, error) {
 	return &GeoIP{db: db}, nil
 }
 
-// LookupCountry returns the ISO 3166-1 alpha-2 country code for an IP address.
-// Returns ("", nil) for private/loopback addresses — these are never
-// sovereignty violations and we skip policy evaluation for them.
-// Returns ("UNKNOWN", nil) if the IP is not in the database (rare).
-func (g *GeoIP) LookupCountry(ipStr string) (string, error) {
+// LookupCountry returns (isoCode, countryName, error)
+func (g *GeoIP) LookupCountry(ipStr string) (string, string, error) {
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
-		return "", fmt.Errorf("invalid IP: %q", ipStr)
+		return "", "", fmt.Errorf("invalid IP: %q", ipStr)
 	}
 
-	// Skip RFC1918 private ranges, loopback, link-local.
-	// These are intra-cluster or node-local connections — never a
-	// cross-border data transfer.
 	if isPrivate(ip) {
-		return "", nil
+		return "", "", nil
 	}
 
 	var record geoRecord
 	if err := g.db.Lookup(ip, &record); err != nil {
-		return "", fmt.Errorf("maxmind lookup %s: %w", ipStr, err)
+		return "", "", fmt.Errorf("maxmind lookup %s: %w", ipStr, err)
 	}
 
 	if record.Country.ISOCode == "" {
-		return "UNKNOWN", nil
+		return "UNKNOWN", "Unknown", nil
 	}
-	return record.Country.ISOCode, nil
+
+	// Extract the English name, fallback to ISO code if missing
+	name := record.Country.Names["en"]
+	if name == "" {
+		name = record.Country.ISOCode
+	}
+
+	return record.Country.ISOCode, name, nil
 }
 
 // Close releases the MaxMind database file handle.
