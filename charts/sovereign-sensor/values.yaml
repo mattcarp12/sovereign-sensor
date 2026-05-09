@@ -1,0 +1,4 @@
+controllerManager:
+  image:
+    repository: ghcr.io/mattcarp12/sovereign-sensor-controller
+    tag: latest

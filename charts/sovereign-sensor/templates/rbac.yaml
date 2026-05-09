@@ -1,0 +1,343 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: sovereign-sensor
+  name: sovereign-sensor-leader-election-role
+  namespace: {{ .Release.Namespace }}
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sovereign-sensor-manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  - serviceaccounts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cilium.io
+  resources:
+  - tracingpolicies
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - clusterrolebindings
+  - clusterroles
+  verbs:
+  - bind
+  - create
+  - delete
+  - escalate
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - sec.sovereign.io
+  resources:
+  - sovereignsensors
+  - sovereigntypolicies
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - sec.sovereign.io
+  resources:
+  - sovereignsensors/finalizers
+  - sovereigntypolicies/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - sec.sovereign.io
+  resources:
+  - sovereignsensors/status
+  - sovereigntypolicies/status
+  verbs:
+  - get
+  - patch
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sovereign-sensor-metrics-auth-role
+rules:
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sovereign-sensor-metrics-reader
+rules:
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: sovereign-sensor
+  name: sovereign-sensor-sovereignsensor-admin-role
+rules:
+- apiGroups:
+  - sec.sovereign.io
+  resources:
+  - sovereignsensors
+  verbs:
+  - '*'
+- apiGroups:
+  - sec.sovereign.io
+  resources:
+  - sovereignsensors/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: sovereign-sensor
+  name: sovereign-sensor-sovereignsensor-editor-role
+rules:
+- apiGroups:
+  - sec.sovereign.io
+  resources:
+  - sovereignsensors
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - sec.sovereign.io
+  resources:
+  - sovereignsensors/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: sovereign-sensor
+  name: sovereign-sensor-sovereignsensor-viewer-role
+rules:
+- apiGroups:
+  - sec.sovereign.io
+  resources:
+  - sovereignsensors
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - sec.sovereign.io
+  resources:
+  - sovereignsensors/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: sovereign-sensor
+  name: sovereign-sensor-sovereigntypolicy-admin-role
+rules:
+- apiGroups:
+  - sec.sovereign.io
+  resources:
+  - sovereigntypolicies
+  verbs:
+  - '*'
+- apiGroups:
+  - sec.sovereign.io
+  resources:
+  - sovereigntypolicies/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: sovereign-sensor
+  name: sovereign-sensor-sovereigntypolicy-editor-role
+rules:
+- apiGroups:
+  - sec.sovereign.io
+  resources:
+  - sovereigntypolicies
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - sec.sovereign.io
+  resources:
+  - sovereigntypolicies/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: sovereign-sensor
+  name: sovereign-sensor-sovereigntypolicy-viewer-role
+rules:
+- apiGroups:
+  - sec.sovereign.io
+  resources:
+  - sovereigntypolicies
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - sec.sovereign.io
+  resources:
+  - sovereigntypolicies/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: sovereign-sensor
+  name: sovereign-sensor-leader-election-rolebinding
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: sovereign-sensor-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: sovereign-sensor-controller-manager
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: sovereign-sensor
+  name: sovereign-sensor-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: sovereign-sensor-manager-role
+subjects:
+- kind: ServiceAccount
+  name: sovereign-sensor-controller-manager
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sovereign-sensor-metrics-auth-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: sovereign-sensor-metrics-auth-role
+subjects:
+- kind: ServiceAccount
+  name: sovereign-sensor-controller-manager
+  namespace: {{ .Release.Namespace }}
