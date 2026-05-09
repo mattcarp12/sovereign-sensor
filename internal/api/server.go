@@ -23,7 +23,7 @@ var frontendAssets embed.FS
 
 type Server struct {
 	Client    client.Client
-	Clientset *kubernetes.Clientset
+	Clientset kubernetes.Interface
 }
 
 func (s *Server) Start(addr string) error {

@@ -6,10 +6,6 @@ import (
 
 // SovereignSensorSpec defines the desired state of SovereignSensor
 type SovereignSensorSpec struct {
-	// Instructs the Operator to automatically deploy the Tetragon DaemonSet alongside the sensor.
-	// +kubebuilder:default=true
-	DeployTetragon bool `json:"deployTetragon"`
-
 	// Controls the verbosity of the sensor agents.
 	// +kubebuilder:default="INFO"
 	LogLevel string `json:"logLevel,omitempty"`

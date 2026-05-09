@@ -8,4 +8,3 @@ metadata:
 spec:
   targetNamespace: "kube-system"
   logLevel: "DEBUG"
-  deployTetragon: false

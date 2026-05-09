@@ -102,7 +102,7 @@ func (r *SovereigntyPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			Kind:    "TracingPolicy",
 		})
 
-		err := r.Get(ctx, types.NamespacedName{Name: policy.Name + "-ebpf-rule"}, found)
+		err := r.Get(ctx, types.NamespacedName{Name: policy.Name + "-ebpf-rule", Namespace: "kube-system"}, found)
 		if err == nil {
 			logger.Info("Removing eBPF blocklist (no longer required by policy)", "Name", found.GetName())
 			if err := r.Delete(ctx, found); err != nil {

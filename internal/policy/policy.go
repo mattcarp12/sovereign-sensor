@@ -1,8 +1,8 @@
 package policy
 
 import (
-	"sync"
 	"github.com/mattcarp12/sovereign-sensor/api/v1alpha1"
+	"sync"
 )
 
 // Matcher provides thread-safe policy lookup.

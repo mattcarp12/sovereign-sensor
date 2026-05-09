@@ -8,6 +8,7 @@ require (
 	github.com/onsi/gomega v1.38.2
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/prometheus/client_golang v1.23.2
+	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.79.3
 	k8s.io/api v0.35.0
 	k8s.io/apimachinery v0.35.0

@@ -42,7 +42,7 @@ func (e *Evaluator) Evaluate(ev *event.SovereignEvent) Verdict {
 
 	// EVALUATION CHAIN: The strictest policy (first violation encountered) wins.
 	for _, pol := range policies {
-		
+
 		// 1. Explicit Deny (DisallowedCountries)
 		for _, blocked := range pol.Spec.DisallowedCountries {
 			if blocked == country {

@@ -56,14 +56,12 @@ func reconcileSensor(ctx context.Context, name string) {
 
 // createSensor creates a cluster-scoped SovereignSensor and registers
 // automatic cleanup so each It() block is hermetic.
-// DeployTetragon defaults to false to keep tests fast and self-contained;
 // pass a mutator func to override spec fields.
 func createSensor(ctx context.Context, name string, mutate func(*secv1alpha1.SovereignSensor)) *secv1alpha1.SovereignSensor {
 	GinkgoHelper()
 	sensor := &secv1alpha1.SovereignSensor{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: secv1alpha1.SovereignSensorSpec{
-			DeployTetragon:  false,
 			LogLevel:        "INFO",
 			TargetNamespace: "default",
 		},
@@ -137,7 +135,7 @@ var _ = Describe("SovereignSensor Controller", func() {
 
 	// ── Child resource creation ───────────────────────────────────────────────
 
-	Context("child resource creation (DeployTetragon=false)", func() {
+	Context("child resource creation", func() {
 		It("should create a DaemonSet in the target namespace", func() {
 			ctx := context.Background()
 			createSensor(ctx, "ds-test", nil)
@@ -384,28 +382,4 @@ var _ = Describe("SovereignSensor Controller", func() {
 		})
 	})
 
-	// ── applyManifests (DeployTetragon=true) ─────────────────────────────────
-
-	Context("when DeployTetragon is true", func() {
-		It("should apply the embedded Tetragon manifests without error", func() {
-			ctx := context.Background()
-			createSensor(ctx, "tetragon-deploy", func(s *secv1alpha1.SovereignSensor) {
-				s.Spec.DeployTetragon = true
-			})
-
-			// The Tetragon manifest contains only standard k8s types (SA, ConfigMap,
-			// ClusterRole, ClusterRoleBinding, DaemonSet, Deployment, Service,
-			// Role, RoleBinding) so envtest can handle all of them natively.
-			// A successful reconcile without error is the assertion.
-			reconcileSensor(ctx, "tetragon-deploy")
-
-			// Spot-check: the Tetragon ServiceAccount defined in tetragon.yaml
-			// should now exist in kube-system.
-			sa := &corev1.ServiceAccount{}
-			Expect(k8sClient.Get(ctx, types.NamespacedName{
-				Name:      "tetragon",
-				Namespace: "kube-system",
-			}, sa)).To(Succeed())
-		})
-	})
 })
