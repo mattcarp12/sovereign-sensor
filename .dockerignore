@@ -14,3 +14,8 @@
 # Allow our specific embedded folders
 !internal/api/dist
 !internal/controller/manifests
+
+# Re-include frontend for building the controller image
+!frontend/
+# Ignore node_modules and build artifacts in the frontend folder
+frontend/node_modules/

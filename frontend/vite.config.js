@@ -6,8 +6,8 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   build: {
-    outDir: '../internal/api/dist', // Output to the Go server's static directory
-    emptyOutDir: true, // Clean the output directory before building
+    // outDir: '../internal/api/dist', // Output to the Go server's static directory
+    // emptyOutDir: true, // Clean the output directory before building
   },
   server: {
     proxy: {

@@ -106,7 +106,7 @@ build-frontend: ## Build React frontend
 	cd frontend && npm run build
 
 .PHONY: docker-build
-docker-build: build-frontend ## Build controller Docker image
+docker-build: ## Build controller Docker image
 	@echo "🔨 Building controller image '$(IMG)'..."
 	$(CONTAINER_TOOL) build -t $(IMG) .
 
