@@ -20,5 +20,8 @@ jobs:
       - name: Install golangci-lint
         run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
+      - name: Install logcheck
+        run: go install github.com/kevinburke/logcheck/cmd/logcheck@latest
+
       - name: Run linter
         run: make lint
