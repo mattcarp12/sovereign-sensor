@@ -39,7 +39,7 @@ func StreamTetragonEvents(ctx context.Context, serverAddr string, events chan<- 
 		stream, err := client.GetEvents(ctx, &tetragon.GetEventsRequest{})
 		if err != nil {
 			slog.Warn("Failed to open event stream", "err", err, "retry_in", currentBackoff)
-			conn.Close()
+			_ = conn.Close()
 			time.Sleep(currentBackoff)
 			currentBackoff = min(currentBackoff*2, maxBackoff)
 			continue
@@ -61,7 +61,7 @@ func StreamTetragonEvents(ctx context.Context, serverAddr string, events chan<- 
 			}
 		}
 
-		conn.Close()
+		_ = conn.Close()
 		time.Sleep(1 * time.Second) // Prevent tight-looping
 	}
 }

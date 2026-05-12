@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -93,8 +94,8 @@ func (r *SovereignSensorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	// 1.5 Auto-Deploy Baseline Tracing Policy
-	baselinePolicy := r.baselineTracingPolicy(&sensor)
-	if err := r.Patch(ctx, baselinePolicy, client.Apply, client.ForceOwnership, client.FieldOwner("sovereign-sensor-controller")); err != nil {
+	baselinePolicy := r.baselineTracingPolicy()
+	if err := r.Apply(ctx, baselinePolicy, client.ForceOwnership, client.FieldOwner("sovereign-sensor-controller")); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -242,7 +243,7 @@ func (r *SovereignSensorReconciler) agentClusterRoleBinding(sensor *secv1alpha1.
 }
 
 // baselineTracingPolicy generates the native Kubernetes object for Tetragon's TCP monitor
-func (r *SovereignSensorReconciler) baselineTracingPolicy(sensor *secv1alpha1.SovereignSensor) *unstructured.Unstructured {
+func (r *SovereignSensorReconciler) baselineTracingPolicy() GenericApplyConfig {
 	tp := &unstructured.Unstructured{}
 	tp.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   "cilium.io",
@@ -266,7 +267,15 @@ func (r *SovereignSensorReconciler) baselineTracingPolicy(sensor *secv1alpha1.So
 			},
 		},
 	}
-	return tp
+	return GenericApplyConfig(tp.Object)
+}
+
+type GenericApplyConfig map[string]any
+
+func (g GenericApplyConfig) IsApplyConfiguration() {}
+
+func (g GenericApplyConfig) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any(g))
 }
 
 // SetupWithManager sets up the controller with the Manager.

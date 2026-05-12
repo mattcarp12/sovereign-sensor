@@ -57,7 +57,7 @@ func reconcileSensor(ctx context.Context, name string) {
 // createSensor creates a cluster-scoped SovereignSensor and registers
 // automatic cleanup so each It() block is hermetic.
 // pass a mutator func to override spec fields.
-func createSensor(ctx context.Context, name string, mutate func(*secv1alpha1.SovereignSensor)) *secv1alpha1.SovereignSensor {
+func createSensor(ctx context.Context, name string, mutate func(*secv1alpha1.SovereignSensor)) {
 	GinkgoHelper()
 	sensor := &secv1alpha1.SovereignSensor{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
@@ -81,8 +81,6 @@ func createSensor(ctx context.Context, name string, mutate func(*secv1alpha1.Sov
 		_ = k8sClient.Update(ctx, latest)
 		_ = k8sClient.Delete(ctx, latest)
 	})
-
-	return sensor
 }
 
 // ─── Test suite ───────────────────────────────────────────────────────────────

@@ -9,7 +9,7 @@ func TestGeoIP_LookupCountry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open MaxMind database: %v", err)
 	}
-	defer geo.Close()
+	defer func() { _ = geo.Close() }()
 
 	tests := []struct {
 		name        string

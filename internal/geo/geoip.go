@@ -88,10 +88,13 @@ var privateRanges = func() []*net.IPNet {
 		"fc00::/7",       // IPv6 unique local
 		"fe80::/10",      // IPv6 link-local
 	}
-	var nets []*net.IPNet
-	for _, cidr := range cidrs {
-		_, n, _ := net.ParseCIDR(cidr)
-		nets = append(nets, n)
+	nets := make([]*net.IPNet, len(cidrs))
+	for i, cidr := range cidrs {
+		_, n, err := net.ParseCIDR(cidr)
+		if err != nil {
+			continue
+		}
+		nets[i] = n
 	}
 	return nets
 }()

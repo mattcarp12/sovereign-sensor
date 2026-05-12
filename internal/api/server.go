@@ -4,6 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"io/fs"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -54,7 +55,9 @@ func listPolicies(c client.Client) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		json.NewEncoder(w).Encode(policies.Items)
+		if err := json.NewEncoder(w).Encode(policies.Items); err != nil {
+			log.Printf("failed to encode policies: %v", err)
+		}
 	}
 }
 
@@ -153,5 +156,7 @@ func (s *Server) handleViolations(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	// (In a production app, we would map this to a cleaner struct,
 	// but returning the raw K8s events array works perfectly for v0.1)
-	json.NewEncoder(w).Encode(events.Items)
+	if err := json.NewEncoder(w).Encode(events.Items); err != nil {
+		log.Printf("failed to encode events: %v", err)
+	}
 }

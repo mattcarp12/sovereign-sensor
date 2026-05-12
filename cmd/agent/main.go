@@ -88,7 +88,7 @@ func main() {
 		slog.Error("Failed to load MaxMind DB", "err", err)
 		os.Exit(1)
 	}
-	defer geoip.Close()
+	defer func() { _ = geoip.Close() }()
 
 	matcher := policy.NewMatcher()
 	evaluator := policy.NewEvaluator(matcher) // No longer takes a logger
