@@ -1,0 +1,67 @@
+name: Feature Request
+description: Propose a new feature or improvement
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before writing code, open a feature request so we can discuss the design. This avoids duplicate work and makes sure new features align with the project direction.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the use case or limitation you're running into. "I want to..." is fine, but "I can't do X because..." is more useful.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What would you like to see? This can be rough — API sketch, pseudocode, or plain description.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Which area does this affect?
+      multiple: true
+      options:
+        - Controller / reconciler
+        - Agent / eBPF enforcement
+        - CRD / API types
+        - Frontend
+        - Helm chart
+        - Documentation
+        - CI / release tooling
+    validations:
+      required: true
+
+  - type: dropdown
+    id: complexity
+    attributes:
+      label: How complex do you think this is?
+      options:
+        - Small (a few lines, clear scope)
+        - Medium (a few files, some design decisions)
+        - Large (significant design work, multiple components)
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Have you thought about other ways to solve this? Why did you prefer the proposed approach?
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Are you interested in implementing this?
+      options:
+        - label: Yes, I'd like to open a PR for this
+        - label: I can help review/test but not implement
+        - label: I'm just requesting it
