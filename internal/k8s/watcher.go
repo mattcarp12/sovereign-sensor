@@ -25,17 +25,17 @@ func WatchPolicies(ctx context.Context, c cache.Cache, matcher *policy.Matcher) 
 
 	// Register the callback functions for the Watch events
 	_, err = informer.AddEventHandler(k8scache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+		AddFunc: func(obj any) {
 			p := obj.(*secv1alpha1.SovereigntyPolicy)
 			matcher.UpsertPolicy(p)
 			slog.Info("Policy added to memory", "name", p.Name)
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(oldObj, newObj any) {
 			p := newObj.(*secv1alpha1.SovereigntyPolicy)
 			matcher.UpsertPolicy(p)
 			slog.Info("Policy updated in memory", "name", p.Name)
 		},
-		DeleteFunc: func(obj interface{}) {
+		DeleteFunc: func(obj any) {
 			p, ok := obj.(*secv1alpha1.SovereigntyPolicy)
 			if !ok {
 				// Handle edge case where the watch disconnected right as the object was deleted

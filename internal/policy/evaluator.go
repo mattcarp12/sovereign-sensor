@@ -1,6 +1,8 @@
 package policy
 
 import (
+	"slices"
+
 	"github.com/mattcarp12/sovereign-sensor/api/v1alpha1"
 	"github.com/mattcarp12/sovereign-sensor/internal/event"
 )
@@ -44,26 +46,18 @@ func (e *Evaluator) Evaluate(ev *event.SovereignEvent) Verdict {
 	for _, pol := range policies {
 
 		// 1. Explicit Deny (DisallowedCountries)
-		for _, blocked := range pol.Spec.DisallowedCountries {
-			if blocked == country {
-				return Verdict{
-					Actions:    pol.Spec.Actions,
-					PolicyName: pol.Name,
-					Reason:     "country explicitly in disallowed list",
-					Violated:   true,
-				}
+		if slices.Contains(pol.Spec.DisallowedCountries, country) {
+			return Verdict{
+				Actions:    pol.Spec.Actions,
+				PolicyName: pol.Name,
+				Reason:     "country explicitly in disallowed list",
+				Violated:   true,
 			}
 		}
 
 		// 2. Implicit Deny (AllowedCountries defined, but not matched)
 		if len(pol.Spec.AllowedCountries) > 0 {
-			isAllowed := false
-			for _, allowed := range pol.Spec.AllowedCountries {
-				if allowed == country {
-					isAllowed = true
-					break
-				}
-			}
+			isAllowed := slices.Contains(pol.Spec.AllowedCountries, country)
 			if !isAllowed {
 				return Verdict{
 					Actions:    pol.Spec.Actions,

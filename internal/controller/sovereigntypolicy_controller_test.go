@@ -427,66 +427,66 @@ func assertOwnerReference(tp *unstructured.Unstructured, policyName string) {
 
 // extractCIDRsManually walks the unstructured object without relying on
 // string-keyed index paths for slice elements.
-func extractCIDRsManually(tp *unstructured.Unstructured) []interface{} {
-	spec, ok := tp.Object["spec"].(map[string]interface{})
+func extractCIDRsManually(tp *unstructured.Unstructured) []any {
+	spec, ok := tp.Object["spec"].(map[string]any)
 	if !ok {
 		return nil
 	}
-	kprobes, ok := spec["kprobes"].([]interface{})
+	kprobes, ok := spec["kprobes"].([]any)
 	if !ok || len(kprobes) == 0 {
 		return nil
 	}
-	kp, ok := kprobes[0].(map[string]interface{})
+	kp, ok := kprobes[0].(map[string]any)
 	if !ok {
 		return nil
 	}
-	selectors, ok := kp["selectors"].([]interface{})
+	selectors, ok := kp["selectors"].([]any)
 	if !ok || len(selectors) == 0 {
 		return nil
 	}
-	sel, ok := selectors[0].(map[string]interface{})
+	sel, ok := selectors[0].(map[string]any)
 	if !ok {
 		return nil
 	}
-	matchArgs, ok := sel["matchArgs"].([]interface{})
+	matchArgs, ok := sel["matchArgs"].([]any)
 	if !ok || len(matchArgs) == 0 {
 		return nil
 	}
-	arg, ok := matchArgs[0].(map[string]interface{})
+	arg, ok := matchArgs[0].(map[string]any)
 	if !ok {
 		return nil
 	}
-	values, _ := arg["values"].([]interface{})
+	values, _ := arg["values"].([]any)
 	return values
 }
 
 // extractActionManually walks the unstructured object to find matchActions[0].action.
 func extractActionManually(tp *unstructured.Unstructured) string {
-	spec, ok := tp.Object["spec"].(map[string]interface{})
+	spec, ok := tp.Object["spec"].(map[string]any)
 	if !ok {
 		return ""
 	}
-	kprobes, ok := spec["kprobes"].([]interface{})
+	kprobes, ok := spec["kprobes"].([]any)
 	if !ok || len(kprobes) == 0 {
 		return ""
 	}
-	kp, ok := kprobes[0].(map[string]interface{})
+	kp, ok := kprobes[0].(map[string]any)
 	if !ok {
 		return ""
 	}
-	selectors, ok := kp["selectors"].([]interface{})
+	selectors, ok := kp["selectors"].([]any)
 	if !ok || len(selectors) == 0 {
 		return ""
 	}
-	sel, ok := selectors[0].(map[string]interface{})
+	sel, ok := selectors[0].(map[string]any)
 	if !ok {
 		return ""
 	}
-	matchActions, ok := sel["matchActions"].([]interface{})
+	matchActions, ok := sel["matchActions"].([]any)
 	if !ok || len(matchActions) == 0 {
 		return ""
 	}
-	action, ok := matchActions[0].(map[string]interface{})
+	action, ok := matchActions[0].(map[string]any)
 	if !ok {
 		return ""
 	}

@@ -252,13 +252,13 @@ func (r *SovereignSensorReconciler) baselineTracingPolicy(sensor *secv1alpha1.So
 	tp.SetName("sovereign-tcp-monitor")
 	tp.SetNamespace("kube-system") // Tetragon's default namespace
 
-	tp.Object["spec"] = map[string]interface{}{
-		"kprobes": []interface{}{
-			map[string]interface{}{
+	tp.Object["spec"] = map[string]any{
+		"kprobes": []any{
+			map[string]any{
 				"call":    "tcp_connect",
 				"syscall": false,
-				"args": []interface{}{
-					map[string]interface{}{
+				"args": []any{
+					map[string]any{
 						"index": 0,
 						"type":  "sock",
 					},

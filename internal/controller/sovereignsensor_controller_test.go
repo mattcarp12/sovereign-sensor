@@ -307,7 +307,7 @@ var _ = Describe("SovereignSensor Controller", func() {
 			ctx := context.Background()
 			createSensor(ctx, "idempotent-sensor", nil)
 
-			for i := 0; i < 3; i++ {
+			for range 3 {
 				reconcileSensor(ctx, "idempotent-sensor")
 			}
 

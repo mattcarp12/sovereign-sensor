@@ -2,6 +2,7 @@ package policy
 
 import (
 	"context"
+	"slices"
 	"sync"
 
 	secv1alpha1 "github.com/mattcarp12/sovereign-sensor/api/v1alpha1"
@@ -50,10 +51,8 @@ func (pr *PolicyReporter) ReportViolator(ctx context.Context, policyName, violat
 		}
 
 		// Check if another agent pod already beat us to adding this IP
-		for _, existing := range current.Status.DiscoveredViolatorIPs {
-			if existing == violatorIP {
-				return nil
-			}
+		if slices.Contains(current.Status.DiscoveredViolatorIPs, violatorIP) {
+			return nil
 		}
 
 		current.Status.DiscoveredViolatorIPs = append(current.Status.DiscoveredViolatorIPs, violatorIP)

@@ -144,12 +144,12 @@ func (r *SovereigntyPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // buildTracingPolicy translates dynamically discovered IPs into a kernel-level Tetragon blocklist
 func (r *SovereigntyPolicyReconciler) buildTracingPolicy(policy *secv1alpha1.SovereigntyPolicy) *unstructured.Unstructured {
 	// 1. Determine the Kernel Action based on the new granular actions array
-	var tetragonAction map[string]interface{}
+	var tetragonAction map[string]any
 
 	if hasAction(policy.Spec.Actions, secv1alpha1.ActionBlockKill) {
-		tetragonAction = map[string]interface{}{"action": "Sigkill"}
+		tetragonAction = map[string]any{"action": "Sigkill"}
 	} else if hasAction(policy.Spec.Actions, secv1alpha1.ActionBlockNoConn) {
-		tetragonAction = map[string]interface{}{
+		tetragonAction = map[string]any{
 			"action":   "Override",
 			"argError": -111, // Return ECONNREFUSED to the application
 		}
@@ -174,32 +174,32 @@ func (r *SovereigntyPolicyReconciler) buildTracingPolicy(policy *secv1alpha1.Sov
 	tp.SetNamespace("kube-system")
 
 	// Convert the discovered IPs into /32 CIDRs for Tetragon
-	var ipValues []interface{}
+	var ipValues []any
 	for _, ip := range policy.Status.DiscoveredViolatorIPs {
 		ipValues = append(ipValues, ip+"/32")
 	}
 
-	tp.Object["spec"] = map[string]interface{}{
-		"kprobes": []interface{}{
-			map[string]interface{}{
+	tp.Object["spec"] = map[string]any{
+		"kprobes": []any{
+			map[string]any{
 				"call":    "tcp_connect",
 				"syscall": false,
-				"args": []interface{}{
-					map[string]interface{}{
+				"args": []any{
+					map[string]any{
 						"index": 0,
 						"type":  "sock",
 					},
 				},
-				"selectors": []interface{}{
-					map[string]interface{}{
-						"matchArgs": []interface{}{
-							map[string]interface{}{
+				"selectors": []any{
+					map[string]any{
+						"matchArgs": []any{
+							map[string]any{
 								"index":    0,
 								"operator": "DAddr",
 								"values":   ipValues,
 							},
 						},
-						"matchActions": []interface{}{
+						"matchActions": []any{
 							tetragonAction,
 						},
 					},
