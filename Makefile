@@ -53,9 +53,9 @@ help: ## Display this help
 # =============================================================================
 
 .PHONY: cluster-up
-cluster-up: ## Create local Kind cluster
-	@echo "🚀 Starting Kind cluster '$(CLUSTER_NAME)'..."
-	kind create cluster --name $(CLUSTER_NAME)
+cluster-up: ## Create local Kind cluster only if it doesn't exist
+	@echo "🚀 Checking Kind cluster '$(CLUSTER_NAME)'..."
+	@kind get clusters | grep -q "^$(CLUSTER_NAME)$$" || kind create cluster --name $(CLUSTER_NAME)
 
 .PHONY: cluster-down
 cluster-down: ## Delete local Kind cluster
@@ -65,31 +65,39 @@ cluster-down: ## Delete local Kind cluster
 .PHONY: vendor-manifests
 vendor-manifests: ## Download and template third-party manifests for embedding
 	@echo "📥 Vendoring Tetragon manifests (v$(TETRAGON_VERSION))..."
-	helm repo add cilium https://helm.cilium.io/ > /dev/null 2>&1
-	helm repo update > /dev/null 2>&1
-	helm template tetragon cilium/tetragon \
+	@helm repo add cilium https://helm.cilium.io/ > /dev/null 2>&1
+	@helm repo update > /dev/null 2>&1
+	@mkdir -p hack
+	@helm template tetragon cilium/tetragon \
 		--namespace kube-system \
 		--version $(TETRAGON_VERSION) \
 		> hack/tetragon.yaml
 	@echo "✅ Vendored into hack/tetragon.yaml"
 
-.PHONY: dev
-dev: manifests vendor-manifests build-frontend docker-build docker-build-agent cluster-down cluster-up kind-load install deploy ## Full local development setup
-	@echo "⏳ Installing Tetragon $(TETRAGON_VERSION)..."
-	kubectl apply -f hack/tetragon.yaml
-	@echo "⚙️  Waiting for controller manager..."
-	kubectl rollout status deployment sovereign-sensor-controller-manager -n sovereign-sensor-system --timeout=90s
-	@echo "🚀 Applying sample resources..."
-	kubectl apply -f config/samples/sensor.yaml
-	kubectl apply -f config/samples/policy.yaml
-	kubectl apply -f config/samples/violator.yaml
-	@echo "Forwarding Port to access frontend..."
-	kubectl port-forward svc/sovereign-sensor-controller-manager-api -n sovereign-sensor-system 8080:8080
-# 	@echo "✅ Development environment ready!"
+# REFACTOR: Full bootstrap setup (Destructive/Fresh State)
+.PHONY: dev-bootstrap
+dev-bootstrap: cluster-down cluster-up dev-update ## Full scratch setup: teardown, rebuild cluster, deploy code
 
+.PHONY: dev-update
+dev-update: manifests vendor-manifests kind-load install deploy
+	@echo "⚙️  Forcing Kubernetes to pick up the new image layers..."
+	kubectl rollout restart deployment sovereign-sensor-controller-manager -n sovereign-sensor-system
+	@echo "⏳ Waiting for controller manager rollout..."
+	kubectl rollout status deployment sovereign-sensor-controller-manager -n sovereign-sensor-system --timeout=90s
+	@echo "🚀 Applying sample configurations..."
+	kubectl apply -f config/samples/sensor.yaml || true
+	kubectl apply -f config/samples/policy.yaml || true
+	kubectl apply -f config/samples/violator.yaml || true
+	@echo "Forwarding Port to access frontend... (Press Ctrl+C to stop)"
+	kubectl port-forward svc/sovereign-sensor-controller-manager-api -n sovereign-sensor-system 8080:8080
+
+
+# Keep your original 'make dev' mapping to the fast update route for daily use
+.PHONY: dev
+dev: cluster-up dev-update
 
 .PHONY: zip
-zip:
+zip: ## Package workspace archive
 	zip -r ss.zip . -x ".devcontainer/*" ".github/*" "bin/*" "frontend/node_modules/*" "frontend/public/*" "internal/api/dist/*" "internal/geo/*.mmdb"
 
 # =============================================================================
@@ -97,16 +105,17 @@ zip:
 # =============================================================================
 
 .PHONY: build
-build: manifests generate fmt vet ## Build manager binary
+build: manifests generate fmt vet build-frontend ## Build manager binary locally
 	go build -o bin/manager cmd/controller/main.go
 
 .PHONY: build-frontend
-build-frontend: ## Build React frontend
+build-frontend: ## Build React frontend assets
 	@echo "🏗️  Building React frontend..."
 	cd frontend && npm run build
 
+# REFACTOR: Explicitly depend on build-frontend so parallel compilation stays safe
 .PHONY: docker-build
-docker-build: ## Build controller Docker image
+docker-build: build-frontend ## Build controller Docker image
 	@echo "🔨 Building controller image '$(IMG)'..."
 	$(CONTAINER_TOOL) build -t $(IMG) .
 
@@ -115,16 +124,12 @@ docker-build-agent: ## Build eBPF agent Docker image
 	@echo "🔨 Building agent image '$(AGENT_IMAGE)'..."
 	$(CONTAINER_TOOL) build -f agent.Dockerfile -t $(AGENT_IMAGE) .
 
-.PHONY: docker-push
-docker-push: ## Push controller Docker image
-	$(CONTAINER_TOOL) push $(IMG)
-
+# REFACTOR: Cleaned redundancy; kind-load handles building its images implicitly
 .PHONY: kind-load
 kind-load: docker-build docker-build-agent ## Load images into Kind cluster
-	@echo "📦 Loading images into Kind cluster '$(CLUSTER_NAME)'..."
+	@echo "📦 Loading updated images into Kind cluster '$(CLUSTER_NAME)'..."
 	kind load docker-image $(IMG) --name $(CLUSTER_NAME)
 	kind load docker-image $(AGENT_IMAGE) --name $(CLUSTER_NAME)
-
 # =============================================================================
 # Code Generation & Quality
 # =============================================================================

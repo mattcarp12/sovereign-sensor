@@ -33,11 +33,16 @@ func (s *Server) Start(addr string) error {
 	// 1. API Endpoints
 	mux.HandleFunc("GET /api/policies", listPolicies(s.Client))
 	mux.HandleFunc("POST /api/policies", createPolicy(s.Client))
-	mux.HandleFunc("DELETE /api/policies", deletePolicy(s.Client))
+
+	// FIX: Added {name} wildcard to the DELETE route
+	mux.HandleFunc("DELETE /api/policies/{name}", deletePolicy(s.Client))
+
+	// NEW: Added PUT route for updates
+	mux.HandleFunc("PUT /api/policies/{name}", updatePolicy(s.Client))
+
 	mux.HandleFunc("GET /api/violations", s.handleViolations)
 
 	// 2. Serve the Embedded React App
-	// We extract the 'dist' folder from the embedded filesystem
 	subFS, err := fs.Sub(frontendAssets, "dist")
 	if err != nil {
 		return err
@@ -63,7 +68,6 @@ func listPolicies(c client.Client) http.HandlerFunc {
 
 // POST /api/policies
 func createPolicy(c client.Client) http.HandlerFunc {
-	// Pre-compile regex for K8s valid names (lowercase alphanumeric and hyphens)
 	nameRegex := regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -79,14 +83,13 @@ func createPolicy(c client.Client) http.HandlerFunc {
 			return
 		}
 
-		// --- STRICT INPUT VALIDATION ---
 		req.Name = strings.TrimSpace(req.Name)
 		if !nameRegex.MatchString(req.Name) {
 			http.Error(w, "Invalid name: must be lowercase alphanumeric and hyphens only", http.StatusBadRequest)
 			return
 		}
 		if req.Namespace == "" {
-			req.Namespace = "default" // Fallback safety
+			req.Namespace = "default"
 		}
 		if len(req.Country) != 2 {
 			http.Error(w, "Invalid country code: must be exactly 2 characters (ISO Alpha-2)", http.StatusBadRequest)
@@ -97,7 +100,6 @@ func createPolicy(c client.Client) http.HandlerFunc {
 			http.Error(w, "Invalid action: must be block-kill, block-noconn, or log", http.StatusBadRequest)
 			return
 		}
-		// -------------------------------
 
 		policy := &secv1alpha1.SovereigntyPolicy{
 			ObjectMeta: metav1.ObjectMeta{Name: req.Name},
@@ -121,7 +123,6 @@ func createPolicy(c client.Client) http.HandlerFunc {
 // DELETE /api/policies/{name}
 func deletePolicy(c client.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Native Go 1.22 path extraction! No more string splitting.
 		name := r.PathValue("name")
 		if name == "" {
 			http.Error(w, "Policy name is required", http.StatusBadRequest)
@@ -132,7 +133,6 @@ func deletePolicy(c client.Client) http.HandlerFunc {
 			ObjectMeta: metav1.ObjectMeta{Name: name},
 		}
 
-		// client.IgnoreNotFound is great here. If it's already deleted, just return 200 OK.
 		if err := client.IgnoreNotFound(c.Delete(r.Context(), policy)); err != nil {
 			http.Error(w, "Failed to delete policy: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -141,9 +141,65 @@ func deletePolicy(c client.Client) http.HandlerFunc {
 	}
 }
 
+// NEW: PUT /api/policies/{name}
+func updatePolicy(c client.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		name := r.PathValue("name")
+		if name == "" {
+			http.Error(w, "Policy name is required", http.StatusBadRequest)
+			return
+		}
+
+		var req struct {
+			Namespace string `json:"namespace"`
+			Country   string `json:"country"`
+			Action    string `json:"action"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
+			return
+		}
+
+		// Input Validation
+		if req.Namespace == "" {
+			req.Namespace = "default"
+		}
+		if len(req.Country) != 2 {
+			http.Error(w, "Invalid country code: must be exactly 2 characters (ISO Alpha-2)", http.StatusBadRequest)
+			return
+		}
+		req.Country = strings.ToUpper(req.Country)
+		if req.Action != "block-kill" && req.Action != "block-noconn" && req.Action != "log" {
+			http.Error(w, "Invalid action: must be block-kill, block-noconn, or log", http.StatusBadRequest)
+			return
+		}
+
+		// 1. Fetch the existing policy so we have its ResourceVersion
+		existingPolicy := &secv1alpha1.SovereigntyPolicy{}
+		err := c.Get(r.Context(), client.ObjectKey{Name: name}, existingPolicy)
+		if err != nil {
+			http.Error(w, "Failed to find existing policy: "+err.Error(), http.StatusNotFound)
+			return
+		}
+
+		// 2. Modify the spec fields
+		existingPolicy.Spec.Namespaces = []string{req.Namespace}
+		existingPolicy.Spec.DisallowedCountries = []string{req.Country}
+		existingPolicy.Spec.Actions = []secv1alpha1.Action{secv1alpha1.Action(req.Action)}
+
+		// 3. Push the update to the cluster
+		if err := c.Update(r.Context(), existingPolicy); err != nil {
+			http.Error(w, "Failed to update policy: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
 // ViolationsHandler queries the K8s API for SovereigntyViolation events
 func (s *Server) handleViolations(w http.ResponseWriter, r *http.Request) {
-	// We only want our specific security events from all namespaces
 	events, err := s.Clientset.CoreV1().Events("").List(r.Context(), metav1.ListOptions{
 		FieldSelector: "reason=SovereigntyViolation",
 	})
@@ -152,10 +208,7 @@ func (s *Server) handleViolations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Format the response
 	w.Header().Set("Content-Type", "application/json")
-	// (In a production app, we would map this to a cleaner struct,
-	// but returning the raw K8s events array works perfectly for v0.1)
 	if err := json.NewEncoder(w).Encode(events.Items); err != nil {
 		log.Printf("failed to encode events: %v", err)
 	}

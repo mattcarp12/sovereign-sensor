@@ -1,22 +1,19 @@
 import { useState, useEffect } from 'react';
-import { ComposableMap, Geographies, Geography } from '@vnedyalk0v/react19-simple-maps';
 import axios from 'axios';
-
-const geoUrl = "https://unpkg.com/world-atlas@2.0.2/countries-110m.json";
 
 function App() {
   const [policies, setPolicies] = useState([]);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
 
-  // New Policy Form State
-  const [newPolicy, setNewPolicy] = useState({
+  // Policy Form State (Handles both Create and Edit modes)
+  const [formData, setFormData] = useState({
     name: '',
     namespace: 'default',
     country: '',
     action: 'block-kill'
   });
+  const [isEditing, setIsEditing] = useState(false);
 
   // Fetch Active Policies
   const fetchPolicies = async () => {
@@ -44,207 +41,233 @@ function App() {
     fetchPolicies();
     fetchViolations();
 
-    // Poll for new blocked packets every 3 seconds
+    // Poll for new violations every 3 seconds
     const interval = setInterval(fetchViolations, 3000);
     return () => clearInterval(interval);
   }, []);
 
-  // Extract the full country name from the enriched event logs
-  const getBlockedCountries = () => {
-    const counts = {};
-    events.forEach(ev => {
-      // Use regex to pull the name out of the brackets e.g. "[China]"
-      const match = ev.message?.match(/\[(.*?)\]/);
-      if (match && match[1]) {
-        let countryName = match[1];
-
-        // Minor normalizations between MaxMind's names and world-atlas names
-        if (countryName === "United States") countryName = "United States of America";
-
-        counts[countryName] = (counts[countryName] || 0) + 1;
-      }
-    });
-    return counts;
-  };
-
-  const blockedCounts = getBlockedCountries();
-
-  // CRUD: Create
-  const handleCreatePolicy = async (e) => {
+  // CRUD: Create or Update Policy
+  const handleSubmitPolicy = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('/api/policies', newPolicy);
-      setShowForm(false);
-      setNewPolicy({ name: '', namespace: 'default', country: '', action: 'block-kill' });
-      fetchPolicies(); // Refresh list
+      if (isEditing) {
+        // Submit modifications to PUT endpoint
+        await axios.put(`/api/policies/${formData.name}`, {
+          namespace: formData.namespace,
+          country: formData.country,
+          action: formData.action
+        });
+      } else {
+        // Create a new policy via POST
+        await axios.post('/api/policies', formData);
+      }
+
+      // Reset State
+      setFormData({ name: '', namespace: 'default', country: '', action: 'block-kill' });
+      setIsEditing(false);
+      fetchPolicies();
     } catch (error) {
-      console.error("Failed to create policy:", error);
-      alert("Error creating policy. Check console.");
+      console.error("Failed to submit policy:", error);
+      alert("Error saving policy. Check your backend console parameters.");
     }
   };
 
   // CRUD: Delete
   const handleDeletePolicy = async (policyName) => {
+    if (!window.confirm(`Are you sure you want to delete policy "${policyName}"?`)) return;
     try {
       await axios.delete(`/api/policies/${policyName}`);
-      fetchPolicies(); // Refresh list
+      fetchPolicies();
     } catch (error) {
       console.error("Failed to delete policy:", error);
     }
   };
 
+  // Populate form with current values to trigger edit mode
+  const startEditPolicy = (policy) => {
+    setIsEditing(true);
+    setFormData({
+      name: policy.metadata?.name || '',
+      namespace: policy.spec?.namespaces?.[0] || 'default',
+      country: policy.spec?.disallowedCountries?.[0] || '',
+      action: policy.spec?.actions?.[0] || 'block-kill'
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cancelEdit = () => {
+    setIsEditing(false);
+    setFormData({ name: '', namespace: 'default', country: '', action: 'block-kill' });
+  };
+
+  // Helper: Filter logs that match a specific policy name
+  const getViolationsForPolicy = (policyName) => {
+    return events.filter(ev => {
+      // Check if the policy is mentioned explicitly in the message string
+      const messageLower = (ev.message || '').toLowerCase();
+      return messageLower.includes(policyName.toLowerCase());
+    });
+  };
+
   return (
-    <div className="min-h-screen bg-white text-black p-8 font-sans">
+    <div style={{ maxW: '800px', margin: '0 auto', padding: '20px', fontFamily: 'monospace' }}>
 
       {/* Header */}
-      <header className="mb-8 border-b-2 border-black pb-4 flex justify-between items-end">
+      <header style={{ borderBottom: '2px solid black', paddingBottom: '10px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h1 className="text-4xl font-bold tracking-tight">Sovereign Sensor</h1>
-          <p className="text-gray-500 mt-1">Data Plane & Policy Overview</p>
+          <h1 style={{ margin: 0, fontSize: '24px' }}>Sovereign Sensor Dashboard</h1>
         </div>
-        <div className="text-sm font-mono bg-black text-white px-3 py-1 flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-          {loading ? 'SYNCING...' : 'LIVE'}
-        </div>
+        
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {/* Policy Management Form */}
+      <section style={{ border: '1px solid black', padding: '15px', marginBottom: '20px', backgroundColor: '#f9f9f9' }}>
+        <h2 style={{ margin: '0 0 10px 0', fontSize: '16px' }}>
+          {isEditing ? `✏️ MODIFY POLICY: ${formData.name}` : '➕ CREATE NEW SOVEREIGNTY POLICY'}
+        </h2>
 
-        {/* Left Column: Policy Management */}
-        <div className="lg:col-span-1 flex flex-col gap-6">
-
-          {/* Policy List Panel */}
-          <div className="border-2 border-black p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">Active Policies</h2>
-              <button
-                onClick={() => setShowForm(!showForm)}
-                className="bg-black hover:bg-gray-800 text-white font-bold py-2 px-4 text-sm transition-colors"
+        <form onSubmit={handleSubmitPolicy}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginBottom: '10px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold' }}>Policy Name</label>
+              <input
+                required
+                type="text"
+                disabled={isEditing} // Name cannot change on PUT
+                placeholder="e.g., block-ru"
+                style={{ width: '100%', padding: '5px', boxSizing: 'border-box', border: '1px solid #999' }}
+                value={formData.name}
+                onChange={e => setFormData({ ...formData, name: e.target.value })}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold' }}>Target Namespace</label>
+              <input
+                required
+                type="text"
+                style={{ width: '100%', padding: '5px', boxSizing: 'border-box', border: '1px solid #999' }}
+                value={formData.namespace}
+                onChange={e => setFormData({ ...formData, namespace: e.target.value })}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold' }}>Country Code (ISO-2)</label>
+              <input
+                required
+                type="text"
+                maxLength="2"
+                placeholder="e.g., RU"
+                style={{ width: '100%', padding: '5px', boxSizing: 'border-box', border: '1px solid #999' }}
+                value={formData.country}
+                onChange={e => setFormData({ ...formData, country: e.target.value.toUpperCase() })}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold' }}>Action Strategy</label>
+              <select
+                style={{ width: '100%', padding: '5px', boxSizing: 'border-box', border: '1px solid #999' }}
+                value={formData.action}
+                onChange={e => setFormData({ ...formData, action: e.target.value })}
               >
-                {showForm ? 'CANCEL' : '+ NEW POLICY'}
+                <option value="block-kill">block-kill</option>
+                <option value="block-noconn">block-noconn</option>
+                <option value="log">log</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button type="submit" style={{ padding: '6px 12px', cursor: 'pointer', background: '#333', color: 'white', border: 'none', fontWeight: 'bold' }}>
+              {isEditing ? 'SAVE CHANGES' : 'APPLY POLICY'}
+            </button>
+            {isEditing && (
+              <button type="button" onClick={cancelEdit} style={{ padding: '6px 12px', cursor: 'pointer', background: '#ccc', color: 'black', border: 'none' }}>
+                Cancel
               </button>
-            </div>
-
-            {/* Create Policy Form */}
-            {showForm && (
-              <form onSubmit={handleCreatePolicy} className="mb-6 p-4 bg-gray-100 border border-black text-sm">
-                <div className="mb-3">
-                  <label className="block font-bold mb-1">Policy Name</label>
-                  <input required type="text" className="w-full p-2 border border-gray-400" placeholder="e.g., block-ru"
-                    value={newPolicy.name} onChange={e => setNewPolicy({ ...newPolicy, name: e.target.value })} />
-                </div>
-                <div className="mb-3 flex gap-2">
-                  <div className="flex-1">
-                    <label className="block font-bold mb-1">Target Namespace</label>
-                    <input required type="text" className="w-full p-2 border border-gray-400"
-                      value={newPolicy.namespace} onChange={e => setNewPolicy({ ...newPolicy, namespace: e.target.value })} />
-                  </div>
-                  <div className="flex-1">
-                    <label className="block font-bold mb-1">Target Country (ISO)</label>
-                    <input required type="text" className="w-full p-2 border border-gray-400" placeholder="e.g., RU" maxLength="2"
-                      value={newPolicy.country} onChange={e => setNewPolicy({ ...newPolicy, country: e.target.value.toUpperCase() })} />
-                  </div>
-                </div>
-                <button type="submit" className="w-full bg-[#326CE5] hover:bg-blue-700 text-white font-bold py-2">
-                  DEPLOY TO MESH
-                </button>
-              </form>
             )}
+          </div>
+        </form>
+      </section>
 
-            {/* Policy List */}
-            {loading ? (
-              <p className="font-mono text-sm animate-pulse">Loading rules from Kubernetes API...</p>
-            ) : policies.length === 0 ? (
-              <p className="text-gray-500 font-mono text-sm">No custom policies applied.</p>
-            ) : (
-              <div className="space-y-4">
-                {policies.map((policy) => {
-                  // Safely extract data depending on your Go struct serialization
-                  const actions = policy.spec?.actions || [];
-                  const disallowed = policy.spec?.disallowedCountries || [];
+      {/* Accordion List */}
+      <main>
+        <h2 style={{ fontSize: '18px', borderBottom: '1px solid black', paddingBottom: '5px' }}>Active System Policies</h2>
 
-                  return (
-                    <div key={policy.metadata?.uid} className="border border-gray-300 p-4 relative group">
-                      <button
-                        onClick={() => handleDeletePolicy(policy.metadata?.name)}
-                        className="absolute top-2 right-2 text-red-500 font-bold text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        [DELETE]
-                      </button>
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-bold text-lg">{policy.metadata?.name}</h3>
-                        <span className="px-2 py-1 text-xs font-mono text-white bg-black">
-                          {actions[0] ? actions[0].toUpperCase() : 'UNKNOWN'}
-                        </span>
+        {loading ? (
+          <p>Gathering cluster object definitions...</p>
+        ) : policies.length === 0 ? (
+          <p style={{ color: '#666', fontStyle: 'italic' }}>No sovereignty rules are loaded into the API server mesh.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {policies.map((policy) => {
+              const pName = policy.metadata?.name;
+              const policyLogs = getViolationsForPolicy(pName);
+
+              return (
+                <details
+                  key={policy.metadata?.uid || pName}
+                  style={{ border: '1px solid black', padding: '10px', backgroundColor: '#fff' }}
+                >
+                  <summary style={{ cursor: 'pointer', fontWeight: 'bold', fontSize: '14px', userSelect: 'none' }}>
+                    📦 {pName} <span style={{ color: '#666', fontWeight: 'normal', fontSize: '12px' }}>
+                      ({policy.spec?.namespaces?.join(', ') || 'all-ns'} ➡️ {policy.spec?.disallowedCountries?.join(', ')})
+                    </span>
+                  </summary>
+
+                  <div style={{ marginTop: '12px', borderTop: '1px dashed #ccc', paddingTop: '10px' }}>
+
+                    {/* Actions and Metadata block */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '15px' }}>
+                      <div style={{ fontSize: '12px', lineHeight: '1.5' }}>
+                        <div><strong>Target Namespaces:</strong> {policy.spec?.namespaces?.join(', ')}</div>
+                        <div><strong>Blocked Countries:</strong> {policy.spec?.disallowedCountries?.join(', ')}</div>
+                        <div><strong>Enforcement Action:</strong> <span style={{ textTransform: 'uppercase', background: '#eee', padding: '2px 4px' }}>{policy.spec?.actions?.[0] || 'LOG'}</span></div>
+                        <div style={{ color: '#777', fontSize: '11px', marginTop: '4px' }}>UID: {policy.metadata?.uid}</div>
                       </div>
-                      <div className="text-xs font-mono text-gray-600 mt-2 space-y-1">
-                        <p><span className="font-bold">NS:</span> {policy.spec?.namespaces?.join(', ')}</p>
-                        <p><span className="font-bold text-red-600">BLOCK:</span> {disallowed.join(', ')}</p>
+
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={() => startEditPolicy(policy)}
+                          style={{ padding: '4px 8px', background: 'none', border: '1px solid black', cursor: 'pointer', fontSize: '12px' }}
+                        >
+                          Modify
+                        </button>
+                        <button
+                          onClick={() => handleDeletePolicy(pName)}
+                          style={{ padding: '4px 8px', background: '#ff4444', color: 'white', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                        >
+                          Delete
+                        </button>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
 
-        {/* Right Column: Visualization & Live Feed */}
-        <div className="lg:col-span-2 flex flex-col gap-6">
+                    {/* Isolated Logs Context Feed */}
+                    <div style={{ background: '#111', color: '#00ff00', padding: '10px', fontSize: '12px', overflowY: 'auto', maxH: '180px' }}>
+                      <div style={{ color: '#aaa', borderBottom: '1px solid #333', paddingBottom: '4px', marginBottom: '6px', fontWeight: 'bold' }}>
+                        📋 Recent Violation Telemetry ({policyLogs.length})
+                      </div>
 
-          {/* The Map */}
-          <div className="border-2 border-black p-6">
-            <h2 className="text-2xl font-bold mb-2">Global Network Topography</h2>
-            <p className="text-gray-500 text-sm mb-4">Packet destinations evaluated by eBPF.</p>
-
-            <div className="bg-gray-50 border border-gray-200 overflow-hidden flex items-center justify-center h-[350px]">
-              <ComposableMap projectionConfig={{ scale: 140 }} width={800} height={400} style={{ width: "100%", height: "100%" }}>
-                <Geographies geography={geoUrl}>
-                  {({ geographies }) =>
-                    geographies.map((geo) => (
-                      <Geography
-                        key={geo.rsmKey}
-                        geography={geo}
-                        // Match directly against the TopoJSON name property!
-                        fill={blockedCounts[geo.properties.name] ? "#ff4444" : "#EAEAEC"}
-                        stroke="#D6D6DA"
-                        strokeWidth={0.5}
-                        style={{
-                          default: { outline: "none" },
-                          hover: { fill: "#326CE5", outline: "none" },
-                          pressed: { fill: "#000000", outline: "none" },
-                        }}
-                      />
-                    ))
-                  }
-                </Geographies>
-              </ComposableMap>
-            </div>
-          </div>
-
-          {/* Live Violations Feed */}
-          <div className="border-2 border-black p-6 bg-black text-white h-[300px] overflow-y-auto">
-            <h2 className="text-xl font-bold mb-4 font-mono">Terminal Output // Violations</h2>
-            {events.length === 0 ? (
-              <p className="text-gray-500 font-mono text-sm animate-pulse">Awaiting network traffic...</p>
-            ) : (
-              <ul className="space-y-3 font-mono text-sm">
-                {events.map((ev, idx) => (
-                  <li key={ev.metadata?.uid || idx} className="border-l-2 border-red-500 pl-3 py-1">
-                    <div className="flex justify-between text-gray-400 text-xs mb-1">
-                      <span>{new Date(ev.lastTimestamp || ev.eventTime).toLocaleTimeString()}</span>
-                      <span>POD: {ev.involvedObject?.name}</span>
+                      {policyLogs.length === 0 ? (
+                        <div style={{ color: '#666', fontStyle: 'italic' }}>No dropped transactions or violations registered for this selector.</div>
+                      ) : (
+                        <ul style={{ listStyleType: 'none', padding: 0, margin: 0 }}>
+                          {policyLogs.map((ev, index) => (
+                            <li key={ev.metadata?.uid || index} style={{ marginBottom: '6px', borderBottom: '1px solid #222', paddingBottom: '4px' }}>
+                              <span style={{ color: '#888' }}>[{new Date(ev.lastTimestamp || ev.eventTime).toLocaleTimeString()}]</span>{' '}
+                              <span style={{ color: '#ff5555' }}>POD: {ev.involvedObject?.name || 'unknown'}</span> — {ev.message}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
-                    <span className="text-red-400 font-bold">BLOCKED: </span>
-                    {ev.message}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
 
-        </div>
-      </div>
+                  </div>
+                </details>
+              );
+            })}
+          </div>
+        )}
+      </main>
     </div>
   );
 }
