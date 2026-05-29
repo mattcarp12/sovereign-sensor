@@ -294,3 +294,24 @@ ENVTEST_VERSION ?= $(shell v='$(call gomodver,sigs.k8s.io/controller-runtime)'; 
 ENVTEST_K8S_VERSION ?= $(shell v='$(call gomodver,k8s.io/api)'; \
   [ -n "$$v" ] || { echo "Set ENVTEST_K8S_VERSION manually" >&2; exit 1; }; \
   printf '%s\n' "$$v" | sed -E 's/^v?[0-9]+\.([0-9]+).*/1.\1/')
+
+  # =============================================================================
+# Release
+# =============================================================================
+
+.PHONY: release
+release: ## Tag the current commit and push to GitHub to trigger the release workflow (e.g., make release VERSION=v0.1.1)
+	@if [ -z "$(VERSION)" ]; then \
+		echo "❌ Error: VERSION is not set."; \
+		echo "💡 Usage: make release VERSION=v0.1.1"; \
+		exit 1; \
+	fi
+	@if ! echo "$(VERSION)" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+.*$$'; then \
+		echo "❌ Error: VERSION must start with 'v' and follow semantic versioning (e.g., v0.1.1)."; \
+		exit 1; \
+	fi
+	@echo "🏷️  Creating git tag $(VERSION)..."
+	git tag $(VERSION)
+	@echo "🚀 Pushing tag $(VERSION) to origin..."
+	git push origin $(VERSION)
+	@echo "✅ Tag pushed successfully! GitHub Actions should now be building your images and Helm chart."

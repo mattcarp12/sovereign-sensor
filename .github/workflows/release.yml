@@ -55,7 +55,7 @@ jobs:
     needs: build-and-push-images
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Needed to push Helm charts to the gh-pages branch
+      contents: write # Needed to push Helm charts and docs to gh-pages
 
     steps:
       - name: Checkout repository
@@ -73,15 +73,15 @@ jobs:
         with:
           version: v3.14.0
 
-      - name: Prepare Documentation for Pages
-        run: |
-          # If you use a static site generator like MkDocs or Hugo, build it here.
-          # If you just have raw markdown/HTML files in docs/, we make sure they land in the root
-          cp -r docs/* .
-
       - name: Run Chart Releaser
         uses: helm/chart-releaser-action@v1.6.0
-        with:
-          charts_dir: charts
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      # NEW: Deploy your documentation to the same branch
+      - name: Deploy Docs to gh-pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+          keep_files: true # CRITICAL: This ensures the Helm index.yaml is not deleted!
