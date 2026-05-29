@@ -1,0 +1,8 @@
+apiVersion: sec.sovereign.io/v1alpha1
+kind: SovereignSensor
+metadata:
+  name: default-sovereign-sensor
+  namespace: {{ .Release.Namespace }}
+spec:
+  targetNamespace: {{ .Values.sensorDefaults.targetNamespace | quote }}
+  logLevel: {{ .Values.sensorDefaults.logLevel | quote }}

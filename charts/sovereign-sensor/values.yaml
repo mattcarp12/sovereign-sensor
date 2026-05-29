@@ -1,4 +1,32 @@
+# Default values for sovereign-sensor.
+
+# Control Plane Component
 controllerManager:
   image:
     repository: ghcr.io/mattcarp12/sovereign-sensor-controller
-    tag: latest
+    tag: "" # Defaults to Chart appVersion if blank
+  resources:
+    limits:
+      cpu: 100m
+      memory: 64Mi
+    requests:
+      cpu: 10m
+      memory: 32Mi
+
+# Data Plane Component
+agent:
+  image:
+    repository: ghcr.io/mattcarp12/sovereign-sensor-agent
+    tag: "" # Defaults to Chart appVersion if blank
+  resources:
+    limits:
+      cpu: 100m
+      memory: 64Mi
+    requests:
+      cpu: 10m
+      memory: 32Mi
+
+# Global settings for your Custom Resources
+sensorDefaults:
+  logLevel: "DEBUG"
+  targetNamespace: "sovereign-sensor-system"

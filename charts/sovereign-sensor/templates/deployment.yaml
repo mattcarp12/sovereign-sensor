@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: sovereign-sensor
     control-plane: controller-manager
   name: sovereign-sensor-controller-manager
@@ -28,7 +27,8 @@ spec:
         - --health-probe-bind-address=:8081
         command:
         - /manager
-        image: "{{ .Values.controllerManager.image.repository }}:{{ .Values.controllerManager.image.tag }}"
+        # Dynamically falls back to the Chart's appVersion if no explicit tag is passed
+        image: "{{ .Values.controllerManager.image.repository }}:{{ .Values.controllerManager.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -37,7 +37,6 @@ spec:
           initialDelaySeconds: 15
           periodSeconds: 20
         name: manager
-        ports: []
         readinessProbe:
           httpGet:
             path: /readyz
@@ -46,22 +45,20 @@ spec:
           periodSeconds: 10
         resources:
           limits:
-            cpu: 500m
-            memory: 128Mi
+            cpu: {{ .Values.controllerManager.resources.limits.cpu }}
+            memory: {{ .Values.controllerManager.resources.limits.memory }}
           requests:
-            cpu: 10m
-            memory: 64Mi
+            cpu: {{ .Values.controllerManager.resources.requests.cpu }}
+            memory: {{ .Values.controllerManager.resources.requests.memory }}
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
             drop:
             - ALL
           readOnlyRootFilesystem: true
-        volumeMounts: []
       securityContext:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
       serviceAccountName: sovereign-sensor-controller-manager
       terminationGracePeriodSeconds: 10
-      volumes: []

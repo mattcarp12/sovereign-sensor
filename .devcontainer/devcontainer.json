@@ -6,7 +6,9 @@
 		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
 		"ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {},
 		"ghcr.io/mpriscella/features/kind:1": {},
-		"ghcr.io/devcontainers/features/node:1": {}
+		"ghcr.io/devcontainers/features/node:1": {},
+		"ghcr.io/devcontainers/features/terraform:1": {},
+		"ghcr.io/devcontainers-extra/features/ansible": {}
 	},
 	"runArgs": [
 		// 1. Give the container permission to load eBPF programs into the kernel
@@ -23,7 +25,7 @@
 				"golang.Go",
 				"ms-kubernetes-tools.vscode-kubernetes-tools",
 				"ms-azuretools.vscode-docker",
-				"ms-vscode-remote.remote-containers",
+				"ms-vscode-remote.remote-containers"
 			]
 		}
 	}

@@ -213,6 +213,23 @@ build-installer: manifests generate kustomize ## Build consolidated install YAML
 	cd config/manager && "$(KUSTOMIZE)" edit set image controller=$(IMG)
 	"$(KUSTOMIZE)" build config/default > dist/install.yaml
 
+.PHONY: sync-helm
+sync-helm: manifests kustomize ## Export Kustomize definitions seamlessly into Helm templates
+	@echo "🔄 Syncing generated Kustomize bases to Helm templates folder..."
+	@mkdir -p charts/sovereign-sensor/templates
+	
+	# Concatenate all generated CRDs cleanly into one Helm target
+	@echo "# Auto-generated from Kustomize CRD bases. Do not edit directly." > charts/sovereign-sensor/templates/crds.yaml
+	@"$(KUSTOMIZE)" build config/crd >> charts/sovereign-sensor/templates/crds.yaml
+	
+	# Export your unified RBAC rules directly into a singular Helm template asset
+	@echo "# Auto-generated from Kustomize RBAC configuration. Do not edit directly." > charts/sovereign-sensor/templates/rbac.yaml
+	@echo "{{- if .Values.rbac.create -}}" >> charts/sovereign-sensor/templates/rbac.yaml
+	@"$(KUSTOMIZE)" build config/rbac | sed 's/namespace: system/namespace: {{ .Release.Namespace }}/g' >> charts/sovereign-sensor/templates/rbac.yaml
+	@echo "{{- end -}}" >> charts/sovereign-sensor/templates/rbac.yaml
+	
+	@echo "✅ Sync complete! Your Helm templates match your Kubebuilder configs."
+
 # =============================================================================
 # Dependencies & Tools
 # =============================================================================

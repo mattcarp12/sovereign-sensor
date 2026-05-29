@@ -4,7 +4,7 @@ name: Release Sovereign Sensor
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   build-and-push-images:
@@ -73,7 +73,15 @@ jobs:
         with:
           version: v3.14.0
 
+      - name: Prepare Documentation for Pages
+        run: |
+          # If you use a static site generator like MkDocs or Hugo, build it here.
+          # If you just have raw markdown/HTML files in docs/, we make sure they land in the root
+          cp -r docs/* .
+
       - name: Run Chart Releaser
         uses: helm/chart-releaser-action@v1.6.0
+        with:
+          charts_dir: charts
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
