@@ -111,7 +111,7 @@ build: manifests generate fmt vet build-frontend ## Build manager binary locally
 .PHONY: build-frontend
 build-frontend: ## Build React frontend assets
 	@echo "🏗️  Building React frontend..."
-	cd frontend && npm run build
+	cd frontend && npm install && npm run build
 
 # REFACTOR: Explicitly depend on build-frontend so parallel compilation stays safe
 .PHONY: docker-build
@@ -130,6 +130,7 @@ kind-load: docker-build docker-build-agent ## Load images into Kind cluster
 	@echo "📦 Loading updated images into Kind cluster '$(CLUSTER_NAME)'..."
 	kind load docker-image $(IMG) --name $(CLUSTER_NAME)
 	kind load docker-image $(AGENT_IMAGE) --name $(CLUSTER_NAME)
+
 # =============================================================================
 # Code Generation & Quality
 # =============================================================================
@@ -295,12 +296,14 @@ ENVTEST_K8S_VERSION ?= $(shell v='$(call gomodver,k8s.io/api)'; \
   [ -n "$$v" ] || { echo "Set ENVTEST_K8S_VERSION manually" >&2; exit 1; }; \
   printf '%s\n' "$$v" | sed -E 's/^v?[0-9]+\.([0-9]+).*/1.\1/')
 
-  # =============================================================================
+
+# =============================================================================
 # Release
 # =============================================================================
 
 .PHONY: release
-release: ## Tag the current commit and push to GitHub to trigger the release workflow (e.g., make release VERSION=v0.1.1)
+# By adding 'test' and 'lint' here, Make will run them first and halt if they fail.
+release: test lint ## Auto-bump Chart.yaml, commit, tag, and push (e.g., make release VERSION=v0.1.1)
 	@if [ -z "$(VERSION)" ]; then \
 		echo "❌ Error: VERSION is not set."; \
 		echo "💡 Usage: make release VERSION=v0.1.1"; \
@@ -310,8 +313,21 @@ release: ## Tag the current commit and push to GitHub to trigger the release wor
 		echo "❌ Error: VERSION must start with 'v' and follow semantic versioning (e.g., v0.1.1)."; \
 		exit 1; \
 	fi
+	@if [ -n "$$(git status --porcelain charts/sovereign-sensor/Chart.yaml)" ]; then \
+		echo "❌ Error: charts/sovereign-sensor/Chart.yaml has uncommitted changes. Please stash or commit them first."; \
+		exit 1; \
+	fi
+	@echo "🧪 Tests and linting passed! Proceeding with release..."
+	@echo "📝 Updating Chart.yaml to version $(shell echo $(VERSION) | sed 's/^v//')..."
+	@# We use perl instead of sed here to ensure cross-platform compatibility between macOS and Linux
+	@perl -pi -e 's/^version: .*/version: $(shell echo $(VERSION) | sed s/^v//)/' charts/sovereign-sensor/Chart.yaml
+	@perl -pi -e 's/^appVersion: .*/appVersion: "$(shell echo $(VERSION) | sed s/^v//)"/' charts/sovereign-sensor/Chart.yaml
+	@echo "📦 Committing version bump to main..."
+	git add charts/sovereign-sensor/Chart.yaml
+	git commit -m "chore: bump chart version to $(VERSION)"
+	git push origin main
 	@echo "🏷️  Creating git tag $(VERSION)..."
 	git tag $(VERSION)
 	@echo "🚀 Pushing tag $(VERSION) to origin..."
 	git push origin $(VERSION)
-	@echo "✅ Tag pushed successfully! GitHub Actions should now be building your images and Helm chart."
+	@echo "✅ Release fully automated and pushed! GitHub Actions is taking over."
