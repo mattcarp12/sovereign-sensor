@@ -217,15 +217,21 @@ build-installer: manifests generate kustomize ## Build consolidated install YAML
 sync-helm: manifests kustomize ## Export Kustomize definitions seamlessly into Helm templates
 	@echo "🔄 Syncing generated Kustomize bases to Helm templates folder..."
 	@mkdir -p charts/sovereign-sensor/templates
+	@mkdir -p charts/sovereign-sensor/crds
 	
-	# Concatenate all generated CRDs cleanly into one Helm target
-	@echo "# Auto-generated from Kustomize CRD bases. Do not edit directly." > charts/sovereign-sensor/templates/crds.yaml
-	@"$(KUSTOMIZE)" build config/crd >> charts/sovereign-sensor/templates/crds.yaml
+	@echo "🧹 Cleaning up old generated files to prevent duplicates..."
+	@rm -f charts/sovereign-sensor/templates/crds.yaml
+	@rm -f charts/sovereign-sensor/templates/operator-manifests.yaml
 	
-	# Export your unified RBAC rules directly into a singular Helm template asset
-	@echo "# Auto-generated from Kustomize RBAC configuration. Do not edit directly." > charts/sovereign-sensor/templates/rbac.yaml
+	# Put CRDs in the dedicated crds/ folder so Helm installs them FIRST
+	@echo "# Auto-generated from Kustomize CRD bases." > charts/sovereign-sensor/crds/crds.yaml
+	@"$(KUSTOMIZE)" build config/crd >> charts/sovereign-sensor/crds/crds.yaml
+	
+	# Export your unified RBAC rules safely
+	@echo "# Auto-generated from Kustomize RBAC configuration." > charts/sovereign-sensor/templates/rbac.yaml
 	@echo "{{- if .Values.rbac.create -}}" >> charts/sovereign-sensor/templates/rbac.yaml
 	@"$(KUSTOMIZE)" build config/rbac | sed 's/namespace: system/namespace: {{ .Release.Namespace }}/g' >> charts/sovereign-sensor/templates/rbac.yaml
+	@echo "" >> charts/sovereign-sensor/templates/rbac.yaml
 	@echo "{{- end -}}" >> charts/sovereign-sensor/templates/rbac.yaml
 	
 	@echo "✅ Sync complete! Your Helm templates match your Kubebuilder configs."
@@ -301,7 +307,7 @@ ENVTEST_K8S_VERSION ?= $(shell v='$(call gomodver,k8s.io/api)'; \
 # =============================================================================
 
 .PHONY: release
-release: test lint ## Auto-bump Chart.yaml, commit, tag, and push (e.g., make release VERSION=v0.1.1)
+release: sync-helm test lint ## Auto-bump Chart.yaml, commit, tag, and push (e.g., make release VERSION=v0.1.1)
 	@if [ -z "$(VERSION)" ]; then \
 		echo "❌ Error: VERSION is not set."; \
 		echo "💡 Usage: make release VERSION=v0.1.1"; \

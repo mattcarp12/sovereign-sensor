@@ -1,4 +1,4 @@
-# Auto-generated from Kustomize RBAC configuration. Do not edit directly.
+# Auto-generated from Kustomize RBAC configuration.
 {{- if .Values.rbac.create -}}
 apiVersion: v1
 kind: ServiceAccount
@@ -350,4 +350,5 @@ subjects:
 - kind: ServiceAccount
   name: controller-manager
   namespace: {{ .Release.Namespace }}
+
 {{- end -}}
