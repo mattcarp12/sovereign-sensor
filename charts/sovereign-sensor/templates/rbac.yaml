@@ -1,5 +1,4 @@
-# Auto-generated from Kustomize RBAC configuration.
-{{- if .Values.rbac.create -}}
+{{ if .Values.rbac.create }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -350,5 +349,4 @@ subjects:
 - kind: ServiceAccount
   name: sovereign-sensor-controller-manager
   namespace: {{ .Release.Namespace }}
-
-{{- end -}}
+{{ end }}
