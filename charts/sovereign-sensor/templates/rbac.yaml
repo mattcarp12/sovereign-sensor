@@ -6,7 +6,7 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: sovereign-sensor
-  name: controller-manager
+  name: sovereign-sensor-controller-manager
   namespace: {{ .Release.Namespace }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -319,7 +319,7 @@ roleRef:
   name: leader-election-role
 subjects:
 - kind: ServiceAccount
-  name: controller-manager
+  name: sovereign-sensor-controller-manager
   namespace: {{ .Release.Namespace }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -335,7 +335,7 @@ roleRef:
   name: manager-role
 subjects:
 - kind: ServiceAccount
-  name: controller-manager
+  name: sovereign-sensor-controller-manager
   namespace: {{ .Release.Namespace }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -348,7 +348,7 @@ roleRef:
   name: metrics-auth-role
 subjects:
 - kind: ServiceAccount
-  name: controller-manager
+  name: sovereign-sensor-controller-manager
   namespace: {{ .Release.Namespace }}
 
 {{- end -}}
