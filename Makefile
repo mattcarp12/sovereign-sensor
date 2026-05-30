@@ -222,17 +222,14 @@ sync-helm: manifests kustomize ## Export Kustomize definitions seamlessly into H
 	@echo "🧹 Cleaning up old generated files to prevent duplicates..."
 	@rm -f charts/sovereign-sensor/templates/crds.yaml
 	@rm -f charts/sovereign-sensor/templates/operator-manifests.yaml
+	@rm -f charts/sovereign-sensor/templates/serviceaccount.yaml
 	
-	# Put CRDs in the dedicated crds/ folder so Helm installs them FIRST
-	@echo "# Auto-generated from Kustomize CRD bases." > charts/sovereign-sensor/crds/crds.yaml
-	@"$(KUSTOMIZE)" build config/crd >> charts/sovereign-sensor/crds/crds.yaml
+	@"$(KUSTOMIZE)" build config/crd > charts/sovereign-sensor/crds/crds.yaml
 	
-	# Export your unified RBAC rules safely
-	@echo "# Auto-generated from Kustomize RBAC configuration." > charts/sovereign-sensor/templates/rbac.yaml
-	@echo "{{- if .Values.rbac.create -}}" >> charts/sovereign-sensor/templates/rbac.yaml
-	@"$(KUSTOMIZE)" build config/rbac | sed 's/namespace: system/namespace: {{ .Release.Namespace }}/g' >> charts/sovereign-sensor/templates/rbac.yaml
-	@echo "" >> charts/sovereign-sensor/templates/rbac.yaml
-	@echo "{{- end -}}" >> charts/sovereign-sensor/templates/rbac.yaml
+	@# Notice the hyphens are removed from the Helm tags below to preserve newlines!
+	@echo "{{ if .Values.rbac.create }}" > charts/sovereign-sensor/templates/rbac.yaml
+	@"$(KUSTOMIZE)" build config/rbac | sed 's/namespace: system/namespace: {{ .Release.Namespace }}/g' | sed 's/name: controller-manager/name: sovereign-sensor-controller-manager/g' >> charts/sovereign-sensor/templates/rbac.yaml
+	@echo "{{ end }}" >> charts/sovereign-sensor/templates/rbac.yaml
 	
 	@echo "✅ Sync complete! Your Helm templates match your Kubebuilder configs."
 
@@ -307,7 +304,8 @@ ENVTEST_K8S_VERSION ?= $(shell v='$(call gomodver,k8s.io/api)'; \
 # =============================================================================
 
 .PHONY: release
-release: sync-helm test lint ## Auto-bump Chart.yaml, commit, tag, and push (e.g., make release VERSION=v0.1.1)
+# NEW: Notice how we added 'sync-helm' as a mandatory prerequisite to 'release'!
+release: test lint sync-helm ## Auto-bump Chart.yaml, commit, tag, and push (e.g., make release VERSION=v0.1.1)
 	@if [ -z "$(VERSION)" ]; then \
 		echo "❌ Error: VERSION is not set."; \
 		echo "💡 Usage: make release VERSION=v0.1.1"; \
@@ -317,18 +315,12 @@ release: sync-helm test lint ## Auto-bump Chart.yaml, commit, tag, and push (e.g
 		echo "❌ Error: VERSION must start with 'v' and follow semantic versioning (e.g., v0.1.1)."; \
 		exit 1; \
 	fi
-	@if [ -n "$$(git status --porcelain charts/sovereign-sensor/Chart.yaml)" ]; then \
-		echo "❌ Error: charts/sovereign-sensor/Chart.yaml has uncommitted changes. Please stash or commit them first."; \
-		exit 1; \
-	fi
-	@echo "🧪 Tests and linting passed! Proceeding with release..."
 	@echo "📝 Updating Chart.yaml to version $(shell echo $(VERSION) | sed 's/^v//')..."
-	@# We use perl instead of sed here to ensure cross-platform compatibility between macOS and Linux
 	@perl -pi -e 's/^version: .*/version: $(shell echo $(VERSION) | sed s/^v//)/' charts/sovereign-sensor/Chart.yaml
 	@perl -pi -e 's/^appVersion: .*/appVersion: "$(shell echo $(VERSION) | sed s/^v//)"/' charts/sovereign-sensor/Chart.yaml
-	@echo "📦 Committing version bump to main..."
-	git add charts/sovereign-sensor/Chart.yaml
-	git commit -m "chore: bump chart version to $(VERSION)"
+	@echo "📦 Committing entire chart directory to main..."
+	git add charts/
+	git commit -m "chore: release chart $(VERSION)" || true
 	git push origin main
 	@echo "🏷️  Creating git tag $(VERSION)..."
 	git tag $(VERSION)

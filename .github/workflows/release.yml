@@ -17,20 +17,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Prepare Docker Variables
+        id: prep
+        run: |
+          # Strip the 'v' from the git tag (e.g., v0.1.9 becomes 0.1.9)
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+          # Force the GitHub username to lowercase
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "owner=${OWNER}" >> $GITHUB_OUTPUT
+
       - name: Log in to the Container registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ghcr.io/${{ github.repository_owner }}/sovereign-sensor-controller
-            ghcr.io/${{ github.repository_owner }}/sovereign-sensor-agent
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -41,16 +44,17 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/sovereign-sensor-controller:${{ github.ref_name }}
+          # Use our sanitized lowercase owner and version (no 'v')
+          tags: ghcr.io/${{ steps.prep.outputs.owner }}/sovereign-sensor-controller:${{ steps.prep.outputs.version }}
 
       - name: Build and push Agent Image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./agent.Dockerfile # Ensure this matches your agent dockerfile name
+          file: ./agent.Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/sovereign-sensor-agent:${{ github.ref_name }}
-
+          # Use our sanitized lowercase owner and version (no 'v')
+          tags: ghcr.io/${{ steps.prep.outputs.owner }}/sovereign-sensor-agent:${{ steps.prep.outputs.version }}
   release-helm-chart:
     needs: build-and-push-images
     runs-on: ubuntu-latest
@@ -78,10 +82,9 @@ jobs:
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
-      # NEW: Deploy your documentation to the same branch
       - name: Deploy Docs to gh-pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./docs
-          keep_files: true # CRITICAL: This ensures the Helm index.yaml is not deleted!
+          keep_files: true
