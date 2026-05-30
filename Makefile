@@ -74,9 +74,8 @@ vendor-manifests: ## Download and template third-party manifests for embedding
 		> hack/tetragon.yaml
 	@echo "✅ Vendored into hack/tetragon.yaml"
 
-# REFACTOR: Full bootstrap setup (Destructive/Fresh State)
 .PHONY: dev-bootstrap
-dev-bootstrap: cluster-down cluster-up dev-update ## Full scratch setup: teardown, rebuild cluster, deploy code
+dev-bootstrap: cluster-down cluster-up dev-update
 
 .PHONY: dev-update
 dev-update: manifests vendor-manifests kind-load install deploy
@@ -302,7 +301,6 @@ ENVTEST_K8S_VERSION ?= $(shell v='$(call gomodver,k8s.io/api)'; \
 # =============================================================================
 
 .PHONY: release
-# By adding 'test' and 'lint' here, Make will run them first and halt if they fail.
 release: test lint ## Auto-bump Chart.yaml, commit, tag, and push (e.g., make release VERSION=v0.1.1)
 	@if [ -z "$(VERSION)" ]; then \
 		echo "❌ Error: VERSION is not set."; \

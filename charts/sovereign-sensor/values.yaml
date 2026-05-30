@@ -26,6 +26,10 @@ agent:
       cpu: 10m
       memory: 32Mi
 
+# Whether to create RBAC resources (Roles, ClusterRoles, and Bindings)
+rbac:
+  create: true
+
 # Global settings for your Custom Resources
 sensorDefaults:
   logLevel: "DEBUG"
